@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinetic Sculpture - Music Reactive</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%),
+                linear-gradient(135deg, #0a0a0a, #1a1a2e, #16213e);
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            background: transparent;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100%;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            z-index: 100;
+            background: rgba(0,0,0,0.9);
+            padding: 12px;
+            border-radius: 15px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            max-width: 200px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .controls.hidden {
+            opacity: 0;
+            transform: translateX(-100%);
+            pointer-events: none;
+        }
+
+        .controls h3 {
+            margin: 0 0 10px 0;
+            color: #00ff88;
+        }
+
+        .controls input[type="file"] {
+            margin: 10px 0;
+            color: #fff;
+        }
+
+        .controls button {
+            background: linear-gradient(45deg, #ff006e, #8338ec);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        .controls button:hover {
+            transform: scale(1.05);
+        }
+
+        .controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .frequency-bars {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 3px;
+            height: 80px;
+            align-items: flex-end;
+            background: rgba(0,0,0,0.4);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .frequency-bars.hidden {
+            opacity: 0;
+            transform: translateX(-50%) translateY(100%);
+            pointer-events: none;
+        }
+
+        .freq-bar {
+            width: 6px;
+            background: linear-gradient(to top, #ff006e, #8338ec, #00ff88);
+            border-radius: 3px;
+            transition: height 0.1s ease;
+            box-shadow: 0 0 10px rgba(255, 0, 110, 0.5);
+        }
+
+        .info {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            color: #fff;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 15px;
+            font-size: 11px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .info.hidden {
+            opacity: 0;
+            transform: translateX(100%);
+            pointer-events: none;
+        }
+
+        .hotkey-hint {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 10px;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s ease;
+            z-index: 101;
+        }
+
+        .hotkey-hint.hidden {
+            opacity: 0;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.03;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="hotkey-hint" id="hotkeyHint">
+        Press 'H' to hide/show UI
+    </div>
+    
+    <div class="grid-overlay"></div>
+    
+    <div class="controls">
+        <h3>🎵 Kinetic Sculpture</h3>
+        <input type="file" id="audioFile" accept="audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/aac">
+        <br>
+        <button id="playPause">▶️ Play Demo</button>
+        <button id="resetBtn">🔄 Reset</button>
+        <div style="margin-top: 10px; font-size: 12px;">
+            Best: MP3 files under 50MB<br>
+            Or use demo mode (no upload needed)
+        </div>
+    </div>
+
+    <div class="frequency-bars" id="freqBars"></div>
+
+    <div class="info">
+        <div>🎚️ Bass drives gears</div>
+        <div>🎵 Mids control pendulums</div>
+        <div>✨ Highs power pistons</div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        class KineticSculpture {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resizeCanvas();
+                
+                this.audioContext = null;
+                this.analyser = null;
+                this.dataArray = null;
+                this.source = null;
+                this.audio = null;
+                this.isPlaying = false;
+                this.animationId = null;
+                
+                // Kinetic elements
+                this.gears = [];
+                this.pendulums = [];
+                this.pistons = [];
+                this.springs = [];
+                this.particles = [];
+                this.beams = [];
+                
+                // Audio data
+                this.bass = 0;
+                this.mids = 0;
+                this.highs = 0;
+                this.demoTime = 0;
+                this.uiVisible = true;
+                
+                this.setupElements();
+                this.setupEventListeners();
+                this.setupFrequencyBars();
+                this.setupHotkeyHint();
+                this.animate();
+            }
+            
+            resizeCanvas() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+            
+            setupElements() {
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                const aspectRatio = this.canvas.width / this.canvas.height;
+                
+                // Adjust for vertical/tall layouts (9:16)
+                const isVertical = aspectRatio < 1;
+                const scale = isVertical ? 0.8 : 1;
+                const verticalSpacing = isVertical ? this.canvas.height * 0.12 : 120;
+                const horizontalSpacing = isVertical ? this.canvas.width * 0.15 : 150;
+                
+                // Create more gears arranged vertically for 9:16
+                this.gears = [
+                    // Top row
+                    { x: centerX - horizontalSpacing, y: centerY - verticalSpacing * 2, radius: 60 * scale, rotation: 0, speed: 0, teeth: 12 },
+                    { x: centerX + horizontalSpacing, y: centerY - verticalSpacing * 2, radius: 50 * scale, rotation: 0, speed: 0, teeth: 10 },
+                    
+                    // Middle row (larger central gears)
+                    { x: centerX - horizontalSpacing * 1.2, y: centerY - verticalSpacing * 0.5, radius: 80 * scale, rotation: 0, speed: 0, teeth: 16 },
+                    { x: centerX, y: centerY, radius: 90 * scale, rotation: 0, speed: 0, teeth: 18 },
+                    { x: centerX + horizontalSpacing * 1.2, y: centerY + verticalSpacing * 0.5, radius: 70 * scale, rotation: 0, speed: 0, teeth: 14 },
+                    
+                    // Bottom row
+                    { x: centerX - horizontalSpacing * 0.8, y: centerY + verticalSpacing * 1.8, radius: 45 * scale, rotation: 0, speed: 0, teeth: 9 },
+                    { x: centerX + horizontalSpacing * 0.8, y: centerY + verticalSpacing * 1.8, radius: 55 * scale, rotation: 0, speed: 0, teeth: 11 },
+                ];
+                
+                // More pendulums spread vertically
+                this.pendulums = [
+                    { x: centerX - horizontalSpacing * 1.8, y: centerY - verticalSpacing * 2.5, length: 100 * scale, angle: 0, velocity: 0, amplitude: 0 },
+                    { x: centerX + horizontalSpacing * 1.8, y: centerY - verticalSpacing * 2.5, length: 120 * scale, angle: 0, velocity: 0, amplitude: 0 },
+                    { x: centerX - horizontalSpacing * 1.5, y: centerY - verticalSpacing * 0.8, length: 80 * scale, angle: 0, velocity: 0, amplitude: 0 },
+                    { x: centerX + horizontalSpacing * 1.5, y: centerY + verticalSpacing * 0.3, length: 110 * scale, angle: 0, velocity: 0, amplitude: 0 },
+                    { x: centerX, y: centerY - verticalSpacing * 3, length: 90 * scale, angle: 0, velocity: 0, amplitude: 0 },
+                ];
+                
+                // Pistons arranged vertically
+                this.pistons = [
+                    { x: centerX - horizontalSpacing * 0.3, y: centerY + verticalSpacing * 2.5, extension: 0, speed: 0, maxExtension: 60 * scale },
+                    { x: centerX + horizontalSpacing * 0.3, y: centerY + verticalSpacing * 2.5, extension: 0, speed: 0, maxExtension: 70 * scale },
+                    { x: centerX - horizontalSpacing * 1.1, y: centerY + verticalSpacing * 2.2, extension: 0, speed: 0, maxExtension: 50 * scale },
+                    { x: centerX + horizontalSpacing * 1.1, y: centerY + verticalSpacing * 2.2, extension: 0, speed: 0, maxExtension: 80 * scale },
+                ];
+                
+                // Add springs for more visual interest
+                this.springs = [
+                    { x: centerX - horizontalSpacing * 0.7, y: centerY + verticalSpacing * 1.2, compression: 0, restLength: 40 * scale },
+                    { x: centerX + horizontalSpacing * 0.7, y: centerY + verticalSpacing * 1.2, compression: 0, restLength: 50 * scale },
+                    { x: centerX, y: centerY + verticalSpacing * 1.5, compression: 0, restLength: 35 * scale },
+                ];
+                
+                // Add connecting rods/beams
+                this.beams = [
+                    { x1: centerX - horizontalSpacing, y1: centerY - verticalSpacing * 2, x2: centerX, y2: centerY, thickness: 8 },
+                    { x1: centerX + horizontalSpacing, y1: centerY - verticalSpacing * 2, x2: centerX, y2: centerY, thickness: 6 },
+                    { x1: centerX, y1: centerY, x2: centerX, y2: centerY + verticalSpacing * 1.8, thickness: 10 },
+                ];
+            }
+            
+            setupEventListeners() {
+                document.getElementById('audioFile').addEventListener('change', (e) => {
+                    this.loadAudioFile(e.target.files[0]);
+                });
+                
+                document.getElementById('playPause').addEventListener('click', () => {
+                    this.togglePlayPause();
+                });
+                
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    this.reset();
+                });
+                
+                // Hotkey listener for hiding UI
+                document.addEventListener('keydown', (e) => {
+                    if (e.key.toLowerCase() === 'h') {
+                        this.toggleUI();
+                    }
+                });
+                
+                window.addEventListener('resize', () => {
+                    this.resizeCanvas();
+                    this.setupElements();
+                });
+            }
+            
+            setupFrequencyBars() {
+                const barsContainer = document.getElementById('freqBars');
+                for (let i = 0; i < 32; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'freq-bar';
+                    bar.style.height = '2px';
+                    barsContainer.appendChild(bar);
+                }
+            }
+            
+            setupHotkeyHint() {
+                // Auto-hide the hotkey hint after 5 seconds
+                setTimeout(() => {
+                    const hint = document.getElementById('hotkeyHint');
+                    if (hint) {
+                        hint.classList.add('hidden');
+                    }
+                }, 5000);
+            }
+            
+            toggleUI() {
+                this.uiVisible = !this.uiVisible;
+                
+                const controls = document.querySelector('.controls');
+                const freqBars = document.querySelector('.frequency-bars');
+                const info = document.querySelector('.info');
+                const hint = document.getElementById('hotkeyHint');
+                
+                if (this.uiVisible) {
+                    controls.classList.remove('hidden');
+                    freqBars.classList.remove('hidden');
+                    info.classList.remove('hidden');
+                    hint.classList.remove('hidden');
+                    
+                    // Auto-hide hint again after showing
+                    setTimeout(() => {
+                        hint.classList.add('hidden');
+                    }, 3000);
+                } else {
+                    controls.classList.add('hidden');
+                    freqBars.classList.add('hidden');
+                    info.classList.add('hidden');
+                    hint.classList.add('hidden');
+                }
+            }
+            
+            async loadAudioFile(file) {
+                if (!file) return;
+                
+                // Check file size (limit to 100MB)
+                if (file.size > 100 * 1024 * 1024) {
+                    alert('File too large. Please use files under 100MB.');
+                    return;
+                }
+                
+                try {
+                    // Clean up previous audio
+                    if (this.audio) {
+                        this.audio.pause();
+                        this.audio.src = '';
+                        this.isPlaying = false;
+                    }
+                    
+                    if (this.audioContext && this.audioContext.state !== 'closed') {
+                        await this.audioContext.close();
+                    }
+                    
+                    // Try multiple loading methods
+                    const loadMethods = [
+                        () => this.loadWithAudioElement(file),
+                        () => this.loadWithArrayBuffer(file)
+                    ];
+                    
+                    let lastError;
+                    for (const method of loadMethods) {
+                        try {
+                            await method();
+                            console.log('Audio loaded successfully');
+                            document.getElementById('playPause').textContent = '▶️ Play Music';
+                            document.getElementById('playPause').disabled = false;
+                            return;
+                        } catch (error) {
+                            console.warn('Load method failed:', error.message);
+                            lastError = error;
+                        }
+                    }
+                    
+                    throw lastError;
+                    
+                } catch (error) {
+                    console.error('All audio loading methods failed:', error);
+                    alert('Could not load audio file. This might be due to:\n• Unsupported format\n• Corrupted file\n• Browser security restrictions\n\nTry converting to MP3 or use demo mode.');
+                    
+                    // Reset to demo mode
+                    this.audio = null;
+                    this.audioContext = null;
+                    document.getElementById('playPause').textContent = '▶️ Play Demo';
+                }
+            }
+            
+            async loadWithAudioElement(file) {
+                // Method 1: Standard Audio Element
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.analyser = this.audioContext.createAnalyser();
+                this.analyser.fftSize = 256;
+                this.analyser.smoothingTimeConstant = 0.8;
+                this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+                
+                this.audio = new Audio();
+                this.audio.crossOrigin = 'anonymous';
+                this.audio.loop = true;
+                this.audio.volume = 0.7;
+                this.audio.preload = 'auto';
+                
+                const audioUrl = URL.createObjectURL(file);
+                this.audio.src = audioUrl;
+                
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Audio loading timeout'));
+                    }, 15000);
+                    
+                    const onLoad = () => {
+                        clearTimeout(timeout);
+                        cleanup();
+                        resolve();
+                    };
+                    
+                    const onError = (e) => {
+                        clearTimeout(timeout);
+                        cleanup();
+                        reject(new Error('Audio element load failed: ' + (e.target.error?.message || 'Media decode error')));
+                    };
+                    
+                    const cleanup = () => {
+                        this.audio.removeEventListener('canplaythrough', onLoad);
+                        this.audio.removeEventListener('loadeddata', onLoad);
+                        this.audio.removeEventListener('error', onError);
+                    };
+                    
+                    this.audio.addEventListener('canplaythrough', onLoad, { once: true });
+                    this.audio.addEventListener('loadeddata', onLoad, { once: true });
+                    this.audio.addEventListener('error', onError, { once: true });
+                    this.audio.load();
+                });
+                
+                this.source = this.audioContext.createMediaElementSource(this.audio);
+                this.source.connect(this.analyser);
+                this.analyser.connect(this.audioContext.destination);
+                
+                setTimeout(() => URL.revokeObjectURL(audioUrl), 1000);
+            }
+            
+            async loadWithArrayBuffer(file) {
+                // Method 2: ArrayBuffer (more compatible but no playback control)
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.analyser = this.audioContext.createAnalyser();
+                this.analyser.fftSize = 256;
+                this.analyser.smoothingTimeConstant = 0.8;
+                this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+                
+                const arrayBuffer = await file.arrayBuffer();
+                const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                
+                // Create a looping buffer source
+                this.createBufferSource(audioBuffer);
+                
+                this.audio = {
+                    play: () => {
+                        if (this.bufferSource) {
+                            this.bufferSource.start();
+                            return Promise.resolve();
+                        }
+                        return Promise.reject(new Error('No buffer source'));
+                    },
+                    pause: () => {
+                        if (this.bufferSource) {
+                            this.bufferSource.stop();
+                            this.createBufferSource(audioBuffer); // Recreate for next play
+                        }
+                    },
+                    currentTime: 0,
+                    loop: true,
+                    volume: 0.7
+                };
+            }
+            
+            createBufferSource(audioBuffer) {
+                if (this.bufferSource) {
+                    this.bufferSource.disconnect();
+                }
+                
+                this.bufferSource = this.audioContext.createBufferSource();
+                this.bufferSource.buffer = audioBuffer;
+                this.bufferSource.loop = true;
+                
+                const gainNode = this.audioContext.createGain();
+                gainNode.gain.value = 0.7;
+                
+                this.bufferSource.connect(gainNode);
+                gainNode.connect(this.analyser);
+                this.analyser.connect(this.audioContext.destination);
+            }
+            
+            togglePlayPause() {
+                if (!this.audio) {
+                    // Demo mode with synthetic audio
+                    this.startDemoMode();
+                    return;
+                }
+                
+                if (this.isPlaying) {
+                    this.audio.pause();
+                    document.getElementById('playPause').textContent = '▶️ Play Music';
+                } else {
+                    // Resume AudioContext if suspended (required by browser policies)
+                    if (this.audioContext.state === 'suspended') {
+                        this.audioContext.resume();
+                    }
+                    
+                    this.audio.play().then(() => {
+                        document.getElementById('playPause').textContent = '⏸️ Pause Music';
+                        this.isPlaying = true;
+                    }).catch(error => {
+                        console.error('Error playing audio:', error);
+                        alert('Could not play audio. Please try again.');
+                    });
+                    return; // Don't toggle isPlaying here, do it in the promise
+                }
+                this.isPlaying = !this.isPlaying;
+            }
+            
+            startDemoMode() {
+                if (this.isPlaying) {
+                    this.isPlaying = false;
+                    document.getElementById('playPause').textContent = '▶️ Play Demo';
+                    return;
+                }
+                
+                this.isPlaying = true;
+                document.getElementById('playPause').textContent = '⏸️ Stop Demo';
+                
+                // Simulate audio data in demo mode
+                this.demoTime = 0;
+            }
+            
+            reset() {
+                if (this.audio) {
+                    this.audio.pause();
+                    this.audio.currentTime = 0;
+                }
+                this.isPlaying = false;
+                this.demoTime = 0;
+                
+                // Update button text based on whether audio is loaded
+                if (this.audio) {
+                    document.getElementById('playPause').textContent = '▶️ Play Music';
+                } else {
+                    document.getElementById('playPause').textContent = '▶️ Play Demo';
+                }
+                
+                this.setupElements();
+            }
+            
+            updateAudioData() {
+                if (this.analyser && this.isPlaying) {
+                    this.analyser.getByteFrequencyData(this.dataArray);
+                    
+                    // Extract frequency ranges
+                    const bassRange = this.dataArray.slice(0, 8);
+                    const midRange = this.dataArray.slice(8, 24);
+                    const highRange = this.dataArray.slice(24, 32);
+                    
+                    this.bass = bassRange.reduce((a, b) => a + b, 0) / bassRange.length / 255;
+                    this.mids = midRange.reduce((a, b) => a + b, 0) / midRange.length / 255;
+                    this.highs = highRange.reduce((a, b) => a + b, 0) / highRange.length / 255;
+                } else if (this.isPlaying) {
+                    // Demo mode - synthetic audio
+                    this.demoTime += 0.016; // 60fps
+                    this.bass = (Math.sin(this.demoTime * 2) + 1) * 0.5;
+                    this.mids = (Math.sin(this.demoTime * 3 + 1) + 1) * 0.5;
+                    this.highs = (Math.sin(this.demoTime * 5 + 2) + 1) * 0.5;
+                    
+                    // Create synthetic frequency data for visualization
+                    this.dataArray = new Uint8Array(32);
+                    for (let i = 0; i < 32; i++) {
+                        this.dataArray[i] = (Math.sin(this.demoTime * (i + 1) * 0.5) + 1) * 127;
+                    }
+                }
+                
+                this.updateFrequencyBars();
+            }
+            
+            updateFrequencyBars() {
+                const bars = document.querySelectorAll('.freq-bar');
+                if (this.dataArray) {
+                    bars.forEach((bar, i) => {
+                        const height = (this.dataArray[i] / 255) * 60;
+                        bar.style.height = Math.max(2, height) + 'px';
+                    });
+                }
+            }
+            
+            drawGear(gear) {
+                const intensity = this.bass * 5 + 0.5;
+                gear.speed = intensity * 0.1;
+                gear.rotation += gear.speed;
+                
+                this.ctx.save();
+                this.ctx.translate(gear.x, gear.y);
+                this.ctx.rotate(gear.rotation);
+                
+                // Gear body
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, gear.radius * 0.8, 0, Math.PI * 2);
+                this.ctx.fillStyle = 'hsl(' + (200 + this.bass * 100) + ', 70%, 50%)';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                
+                // Gear teeth
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 3;
+                for (let i = 0; i < gear.teeth; i++) {
+                    const angle = (i / gear.teeth) * Math.PI * 2;
+                    const x1 = Math.cos(angle) * gear.radius * 0.8;
+                    const y1 = Math.sin(angle) * gear.radius * 0.8;
+                    const x2 = Math.cos(angle) * gear.radius;
+                    const y2 = Math.sin(angle) * gear.radius;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x1, y1);
+                    this.ctx.lineTo(x2, y2);
+                    this.ctx.stroke();
+                }
+                
+                // Center hub
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, gear.radius * 0.3, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#333';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+            
+            drawPendulum(pendulum) {
+                const intensity = this.mids * 3;
+                pendulum.amplitude = intensity * 0.5;
+                pendulum.velocity += (pendulum.amplitude * Math.sin(Date.now() * 0.005) - pendulum.angle) * 0.02;
+                pendulum.velocity *= 0.99; // Damping
+                pendulum.angle += pendulum.velocity;
+                
+                this.ctx.save();
+                this.ctx.translate(pendulum.x, pendulum.y);
+                
+                // Pendulum rod
+                const endX = Math.sin(pendulum.angle) * pendulum.length;
+                const endY = Math.cos(pendulum.angle) * pendulum.length;
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, 0);
+                this.ctx.lineTo(endX, endY);
+                this.ctx.strokeStyle = 'hsl(' + (120 + this.mids * 100) + ', 80%, 60%)';
+                this.ctx.lineWidth = 4;
+                this.ctx.stroke();
+                
+                // Pendulum bob
+                this.ctx.beginPath();
+                this.ctx.arc(endX, endY, 15 + this.mids * 10, 0, Math.PI * 2);
+                this.ctx.fillStyle = 'hsl(' + (120 + this.mids * 100) + ', 80%, 60%)';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                
+                // Pivot point
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#333';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+            
+            drawPiston(piston) {
+                const intensity = this.highs * 4;
+                piston.extension = (Math.sin(Date.now() * 0.01 + intensity) + 1) * 0.5 * piston.maxExtension;
+                
+                this.ctx.save();
+                this.ctx.translate(piston.x, piston.y);
+                
+                // Piston cylinder
+                this.ctx.fillStyle = '#444';
+                this.ctx.fillRect(-20, -10, 40, 20);
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(-20, -10, 40, 20);
+                
+                // Piston rod
+                this.ctx.fillStyle = 'hsl(' + (300 + this.highs * 100) + ', 70%, 60%)';
+                this.ctx.fillRect(-5, 10, 10, piston.extension);
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.strokeRect(-5, 10, 10, piston.extension);
+                
+                // Piston head
+                this.ctx.beginPath();
+                this.ctx.arc(0, 10 + piston.extension, 12, 0, Math.PI * 2);
+                this.ctx.fillStyle = 'hsl(' + (300 + this.highs * 100) + ', 70%, 60%)';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#fff';
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+            
+            drawSpring(spring) {
+                const intensity = (this.bass + this.mids) * 2;
+                spring.compression = Math.sin(Date.now() * 0.008 + intensity) * 20;
+                
+                this.ctx.save();
+                this.ctx.translate(spring.x, spring.y);
+                
+                const springHeight = spring.restLength + spring.compression;
+                const coils = 8;
+                const coilWidth = 15;
+                
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = 'hsl(' + (60 + intensity * 50) + ', 70%, 60%)';
+                this.ctx.lineWidth = 4;
+                
+                // Draw spring coils
+                for (let i = 0; i <= coils * 10; i++) {
+                    const t = i / (coils * 10);
+                    const x = Math.sin(t * Math.PI * 2 * coils) * coilWidth;
+                    const y = t * springHeight;
+                    
+                    if (i === 0) {
+                        this.ctx.moveTo(x, y);
+                    } else {
+                        this.ctx.lineTo(x, y);
+                    }
+                }
+                this.ctx.stroke();
+                
+                // Spring end caps
+                this.ctx.fillStyle = '#666';
+                this.ctx.fillRect(-coilWidth - 5, -5, (coilWidth + 5) * 2, 10);
+                this.ctx.fillRect(-coilWidth - 5, springHeight - 5, (coilWidth + 5) * 2, 10);
+                
+                this.ctx.restore();
+            }
+            
+            drawEnergyField() {
+                const intensity = (this.bass + this.mids + this.highs) / 3;
+                
+                // Create pulsing energy rings
+                this.ctx.save();
+                this.ctx.globalAlpha = 0.1 + intensity * 0.2;
+                
+                for (let i = 0; i < 3; i++) {
+                    const radius = 50 + i * 80 + intensity * 100;
+                    const centerX = this.canvas.width / 2;
+                    const centerY = this.canvas.height / 2;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    this.ctx.strokeStyle = 'hsl(' + (180 + intensity * 180) + ', 70%, 50%)';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+                
+                this.ctx.restore();
+            }
+            
+            drawConnections() {
+                // Draw structural beams first
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                this.ctx.lineWidth = 3;
+                
+                this.beams.forEach(beam => {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(beam.x1, beam.y1);
+                    this.ctx.lineTo(beam.x2, beam.y2);
+                    this.ctx.lineWidth = beam.thickness;
+                    this.ctx.stroke();
+                });
+                
+                // Animated connection lines
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.2 + this.bass * 0.3) + ')';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([10, 5]);
+                
+                // Connect gears in sequence
+                for (let i = 0; i < this.gears.length - 1; i++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.gears[i].x, this.gears[i].y);
+                    this.ctx.lineTo(this.gears[i + 1].x, this.gears[i + 1].y);
+                    this.ctx.stroke();
+                }
+                
+                // Connect pendulums to nearest gears
+                this.pendulums.forEach((pendulum, i) => {
+                    if (this.gears[i]) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(pendulum.x, pendulum.y);
+                        this.ctx.lineTo(this.gears[i].x, this.gears[i].y);
+                        this.ctx.stroke();
+                    }
+                });
+                
+                this.ctx.setLineDash([]);
+            }
+            
+            animate() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.updateAudioData();
+                
+                // Draw connections first (background)
+                this.drawConnections();
+                
+                // Add dynamic background elements
+                this.drawEnergyField();
+                
+                // Draw all kinetic elements
+                this.gears.forEach(gear => this.drawGear(gear));
+                this.pendulums.forEach(pendulum => this.drawPendulum(pendulum));
+                this.pistons.forEach(piston => this.drawPiston(piston));
+                this.springs.forEach(spring => this.drawSpring(spring));
+                
+                // Add some particles for extra visual flair
+                if (Math.random() < (this.bass + this.mids + this.highs) * 0.3) {
+                    this.particles.push({
+                        x: Math.random() * this.canvas.width,
+                        y: Math.random() * this.canvas.height,
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: (Math.random() - 0.5) * 4,
+                        life: 60,
+                        color: 'hsl(' + (Math.random() * 360) + ', 70%, 60%)'
+                    });
+                }
+                
+                // Update and draw particles
+                this.particles = this.particles.filter(particle => {
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    particle.life--;
+                    
+                    this.ctx.save();
+                    this.ctx.globalAlpha = particle.life / 60;
+                    this.ctx.fillStyle = particle.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.restore();
+                    
+                    return particle.life > 0;
+                });
+                
+                this.animationId = requestAnimationFrame(() => this.animate());
+            }
+        }
+        
+        // Initialize the kinetic sculpture when the page loads
+        window.addEventListener('load', () => {
+            new KineticSculpture();
+        });
+    </script>
+</body>
+</html> 
