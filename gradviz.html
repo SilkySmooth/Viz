@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Flowing Gradient Audio Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0a0a;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            color: white;
+        }
+
+        .container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #canvas {
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            max-width: 95vw;
+            max-height: 95vh;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 100;
+            min-width: 280px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .control-group {
+            margin-bottom: 16px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .gradient-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .gradient-option {
+            width: 40px;
+            height: 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .gradient-option.active {
+            border-color: white;
+            transform: scale(1.1);
+        }
+
+        .info {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 250px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .frequency-bars {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            height: 60px;
+            align-items: flex-end;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .freq-bar {
+            width: 6px;
+            background: linear-gradient(to top, #667eea, #764ba2);
+            border-radius: 3px 3px 0 0;
+            transition: height 0.1s ease;
+            min-height: 2px;
+        }
+
+        .demo-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 165, 0, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 200;
+            animation: pulse 2s infinite;
+            transition: opacity 0.3s ease;
+        }
+
+        .controls.hidden,
+        .frequency-bars.hidden,
+        .info.hidden,
+        .demo-indicator.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="canvas"></canvas>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="audioFile">Audio File</label>
+                <input type="file" id="audioFile" accept=".mp3,.wav,.ogg,.m4a" />
+            </div>
+            
+            <div class="control-group">
+                <button id="playPauseBtn">▶ Start Demo</button>
+            </div>
+            
+            <div class="control-group">
+                <label for="volume">Volume: <span id="volumeValue">70%</span></label>
+                <input type="range" id="volume" min="0" max="100" value="70" />
+            </div>
+
+            <div class="control-group">
+                <label for="sensitivity">Audio Sensitivity: <span id="sensitivityValue">1.5x</span></label>
+                <input type="range" id="sensitivity" min="0.5" max="3" step="0.1" value="1.5" />
+            </div>
+
+            <div class="control-group">
+                <label for="speed">Animation Speed: <span id="speedValue">1x</span></label>
+                <input type="range" id="speed" min="0.2" max="3" step="0.1" value="1" />
+            </div>
+
+            <div class="control-group">
+                <label>Gradient Theme</label>
+                <div class="gradient-selector">
+                    <div class="gradient-option active" data-gradient="cosmic" style="background: linear-gradient(90deg, #08008f 0%, #fa0020 50%, #ffcc2b 100%);"></div>
+                    <div class="gradient-option" data-gradient="ocean" style="background: linear-gradient(90deg, #1a2980 0%, #26d0ce 100%);"></div>
+                    <div class="gradient-option" data-gradient="sunset" style="background: linear-gradient(90deg, #ff6b6b 0%, #ffa726 50%, #ffeb3b 100%);"></div>
+                    <div class="gradient-option" data-gradient="forest" style="background: linear-gradient(90deg, #134e5e 0%, #71b280 100%);"></div>
+                    <div class="gradient-option" data-gradient="neon" style="background: linear-gradient(90deg, #ff006e 0%, #00f5ff 100%);"></div>
+                    <div class="gradient-option" data-gradient="aurora" style="background: linear-gradient(90deg, #4facfe 0%, #00f2fe 50%, #43e97b 100%);"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="frequency-bars">
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+            <div class="freq-bar"></div>
+        </div>
+
+        <div class="info">
+            <div>WebGL Flowing Gradient Visualizer</div>
+            <div>Supports: MP3, WAV, OGG, M4A</div>
+            <div>Demo mode with synthetic audio</div>
+            <div>60fps real-time rendering</div>
+        </div>
+
+        <div id="demoIndicator" class="demo-indicator">DEMO MODE</div>
+    </div>
+
+    <script>
+        let visualizer;
+        
+        class WebGLAudioVisualizer {
+            constructor() {
+                // Wait for DOM to be ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => this.initializeElements());
+                } else {
+                    this.initializeElements();
+                }
+            }
+
+            initializeElements() {
+                this.canvas = document.getElementById('canvas');
+                if (!this.canvas) {
+                    console.error('Canvas element not found');
+                    return;
+                }
+                
+                this.gl = null;
+                this.program = null;
+                this.gradientTexture = null;
+                this.audioContext = null;
+                this.analyser = null;
+                this.audioElement = null;
+                this.audioBuffer = null;
+                this.bufferSource = null;
+                this.gainNode = null;
+                this.frequencyData = new Uint8Array(512);
+                this.isPlaying = false;
+                this.demoMode = true;
+                this.startTime = Date.now();
+                this.animationId = null;
+                this.sensitivity = 1.5;
+                this.speed = 1.0;
+                this.volume = 0.7;
+                this.currentGradient = 'cosmic';
+                this.isMuted = false;
+                this.isUIHidden = false;
+                this.bassLevel = 0;
+                this.midLevel = 0;
+                this.highLevel = 0;
+                
+                this.init();
+            }
+
+            init() {
+                this.setupCanvas();
+                this.initWebGL();
+                this.createGradientTexture();
+                this.setupEventListeners();
+                this.animate();
+            }
+
+            setupCanvas() {
+                const aspectRatio = window.innerWidth / window.innerHeight;
+                
+                if (aspectRatio < 1) {
+                    this.canvas.width = Math.min(window.innerWidth * 0.9, 500);
+                    this.canvas.height = Math.min(window.innerHeight * 0.8, 800);
+                } else {
+                    this.canvas.width = Math.min(window.innerWidth * 0.8, 900);
+                    this.canvas.height = Math.min(window.innerHeight * 0.7, 600);
+                }
+            }
+
+            initWebGL() {
+                this.gl = this.canvas.getContext('webgl') || this.canvas.getContext('experimental-webgl');
+                
+                if (!this.gl) {
+                    alert('WebGL not supported!');
+                    return;
+                }
+
+                const vertexShaderSource = `
+                    attribute vec2 a_position;
+                    void main() {
+                        gl_Position = vec4(a_position, 0.0, 1.0);
+                    }
+                `;
+
+                const fragmentShaderSource = `
+                    precision highp float;
+                    
+                    uniform float u_time;
+                    uniform vec2 u_resolution;
+                    uniform sampler2D u_gradient;
+                    uniform float u_bassLevel;
+                    uniform float u_midLevel;
+                    uniform float u_highLevel;
+                    uniform float u_sensitivity;
+                    uniform float u_speed;
+                    
+                    vec3 mod289(vec3 x) {
+                        return x - floor(x * (1.0 / 289.0)) * 289.0;
+                    }
+                    
+                    vec4 mod289(vec4 x) {
+                        return x - floor(x * (1.0 / 289.0)) * 289.0;
+                    }
+                    
+                    vec4 permute(vec4 x) {
+                        return mod289(((x*34.0)+1.0)*x);
+                    }
+                    
+                    vec4 taylorInvSqrt(vec4 r) {
+                        return 1.79284291400159 - 0.85373472095314 * r;
+                    }
+                    
+                    float snoise(vec3 v) {
+                        const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+                        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+                        
+                        vec3 i = floor(v + dot(v, C.yyy));
+                        vec3 x0 = v - i + dot(i, C.xxx);
+                        
+                        vec3 g = step(x0.yzx, x0.xyz);
+                        vec3 l = 1.0 - g;
+                        vec3 i1 = min(g.xyz, l.zxy);
+                        vec3 i2 = max(g.xyz, l.zxy);
+                        
+                        vec3 x1 = x0 - i1 + C.xxx;
+                        vec3 x2 = x0 - i2 + C.yyy;
+                        vec3 x3 = x0 - D.yyy;
+                        
+                        i = mod289(i);
+                        vec4 p = permute(permute(permute(
+                            i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                            + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                            + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+                        
+                        float n_ = 0.142857142857;
+                        vec3 ns = n_ * D.wyz - D.xzx;
+                        
+                        vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+                        
+                        vec4 x_ = floor(j * ns.z);
+                        vec4 y_ = floor(j - 7.0 * x_);
+                        
+                        vec4 x = x_ *ns.x + ns.yyyy;
+                        vec4 y = y_ *ns.x + ns.yyyy;
+                        vec4 h = 1.0 - abs(x) - abs(y);
+                        
+                        vec4 b0 = vec4(x.xy, y.xy);
+                        vec4 b1 = vec4(x.zw, y.zw);
+                        
+                        vec4 s0 = floor(b0)*2.0 + 1.0;
+                        vec4 s1 = floor(b1)*2.0 + 1.0;
+                        vec4 sh = -step(h, vec4(0.0));
+                        
+                        vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+                        vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+                        
+                        vec3 p0 = vec3(a0.xy, h.x);
+                        vec3 p1 = vec3(a0.zw, h.y);
+                        vec3 p2 = vec3(a1.xy, h.z);
+                        vec3 p3 = vec3(a1.zw, h.w);
+                        
+                        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+                        p0 *= norm.x;
+                        p1 *= norm.y;
+                        p2 *= norm.z;
+                        p3 *= norm.w;
+                        
+                        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                        m = m * m;
+                        return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+                    }
+                    
+                    float smoothstep_custom(float t) {
+                        return t * t * t * (t * (6.0 * t - 15.0) + 10.0);
+                    }
+                    
+                    float wave_noise(float x, float offset) {
+                        float time = u_time * u_speed + offset;
+                        float L = 0.0018;
+                        float S = 0.04;
+                        float F = 0.043;
+                        float A = 40.0;
+                        
+                        float noise = 0.0;
+                        noise += snoise(vec3(x * (L / 1.00) + F * time, time * S * 1.00, 0.0)) * A * 0.85;
+                        noise += snoise(vec3(x * (L / 1.30) + F * time, time * S * 1.26, 0.0)) * A * 1.15;
+                        noise += snoise(vec3(x * (L / 1.86) + F * time, time * S * 1.09, 0.0)) * A * 0.60;
+                        noise += snoise(vec3(x * (L / 3.25) + F * time, time * S * 0.89, 0.0)) * A * 0.40;
+                        
+                        return noise;
+                    }
+                    
+                    float calc_blur(float x, float offset) {
+                        float time = u_time * u_speed + offset;
+                        float L = 0.0018;
+                        float S = 0.1;
+                        float F = 0.034;
+                        float BLUR_AMOUNT = 50.0;
+                        
+                        float noise = snoise(vec3(x * L + F * time, time * S, 0.0));
+                        float t = (noise + 1.0) / 2.0;
+                        
+                        float exponent_base = 2.0 + 3.0 * sin(time * 0.3);
+                        t = pow(t, exponent_base);
+                        
+                        float blur_bias = 0.3 + 0.2 * sin(time * 0.15);
+                        
+                        return mix(1.0, BLUR_AMOUNT, t * blur_bias);
+                    }
+                    
+                    float wave_alpha(float Y, float wave_height, float audio_boost) {
+                        float x = gl_FragCoord.x;
+                        float y = gl_FragCoord.y;
+                        float offset = Y * wave_height;
+                        
+                        float enhanced_height = wave_height * (1.0 + audio_boost * u_sensitivity);
+                        float wave_y = Y + wave_noise(x, offset) * enhanced_height;
+                        float dist = wave_y - y;
+                        
+                        float blur = calc_blur(x, offset);
+                        
+                        float alpha = 0.5 + dist / blur;
+                        alpha = clamp(alpha, 0.0, 1.0);
+                        
+                        alpha = smoothstep_custom(alpha);
+                        
+                        return alpha;
+                    }
+                    
+                    float background_noise(float offset) {
+                        float x = gl_FragCoord.x;
+                        float y = gl_FragCoord.y;
+                        float time = u_time * u_speed + offset;
+                        
+                        float L = 0.0015;
+                        float S = 0.13;
+                        float Y_SCALE = 3.0;
+                        float F = 0.11;
+                        
+                        float scaled_y = y * Y_SCALE;
+                        
+                        float noise = 0.5;
+                        noise += snoise(vec3(x * L * 1.0 + F * time * 1.0, scaled_y * L * 1.00, time * S)) * 0.30;
+                        noise += snoise(vec3(x * L * 0.6 + F * time * -0.6, scaled_y * L * 0.85, time * S)) * 0.26;
+                        noise += snoise(vec3(x * L * 0.4 + F * time * 0.8, scaled_y * L * 0.70, time * S)) * 0.22;
+                        
+                        return clamp(noise, 0.0, 1.0);
+                    }
+                    
+                    void main() {
+                        float canvas_height = u_resolution.y;
+                        
+                        float aspect = u_resolution.x / u_resolution.y;
+                        float scale_factor = aspect < 1.0 ? 0.8 : 1.0;
+                        
+                        float WAVE1_Y = 0.75 * canvas_height;
+                        float WAVE2_Y = 0.35 * canvas_height;
+                        float WAVE1_HEIGHT = 28.0 * scale_factor;
+                        float WAVE2_HEIGHT = 35.0 * scale_factor;
+                        
+                        float bass_boost = u_bassLevel * 2.0;
+                        float mid_boost = u_midLevel * 1.5;
+                        float high_boost = u_highLevel * 1.0;
+                        
+                        float w1_alpha = wave_alpha(WAVE1_Y, WAVE1_HEIGHT, bass_boost);
+                        float w2_alpha = wave_alpha(WAVE2_Y, WAVE2_HEIGHT, mid_boost);
+                        
+                        float bg_lightness = background_noise(0.0) * (1.0 + high_boost * 0.3);
+                        float w1_lightness = background_noise(200.0) * (1.0 + bass_boost * 0.5);
+                        float w2_lightness = background_noise(400.0) * (1.0 + mid_boost * 0.4);
+                        
+                        float lightness = bg_lightness;
+                        lightness = mix(lightness, w1_lightness, w1_alpha);
+                        lightness = mix(lightness, w2_lightness, w2_alpha);
+                        
+                        float overall_audio = (u_bassLevel + u_midLevel + u_highLevel) / 3.0;
+                        lightness += overall_audio * 0.1 * u_sensitivity;
+                        lightness = clamp(lightness, 0.0, 1.0);
+                        
+                        gl_FragColor = texture2D(u_gradient, vec2(lightness, 0.5));
+                    }
+                `;
+
+                const vertexShader = this.createShader(this.gl.VERTEX_SHADER, vertexShaderSource);
+                const fragmentShader = this.createShader(this.gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+                this.program = this.gl.createProgram();
+                this.gl.attachShader(this.program, vertexShader);
+                this.gl.attachShader(this.program, fragmentShader);
+                this.gl.linkProgram(this.program);
+
+                if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) {
+                    console.error('Program linking failed:', this.gl.getProgramInfoLog(this.program));
+                    return;
+                }
+
+                const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+                const positionBuffer = this.gl.createBuffer();
+                this.gl.bindBuffer(this.gl.ARRAY_BUFFER, positionBuffer);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, positions, this.gl.STATIC_DRAW);
+
+                const positionLocation = this.gl.getAttribLocation(this.program, 'a_position');
+                this.gl.enableVertexAttribArray(positionLocation);
+                this.gl.vertexAttribPointer(positionLocation, 2, this.gl.FLOAT, false, 0, 0);
+
+                this.uniforms = {
+                    time: this.gl.getUniformLocation(this.program, 'u_time'),
+                    resolution: this.gl.getUniformLocation(this.program, 'u_resolution'),
+                    gradient: this.gl.getUniformLocation(this.program, 'u_gradient'),
+                    bassLevel: this.gl.getUniformLocation(this.program, 'u_bassLevel'),
+                    midLevel: this.gl.getUniformLocation(this.program, 'u_midLevel'),
+                    highLevel: this.gl.getUniformLocation(this.program, 'u_highLevel'),
+                    sensitivity: this.gl.getUniformLocation(this.program, 'u_sensitivity'),
+                    speed: this.gl.getUniformLocation(this.program, 'u_speed')
+                };
+            }
+
+            createShader(type, source) {
+                const shader = this.gl.createShader(type);
+                this.gl.shaderSource(shader, source);
+                this.gl.compileShader(shader);
+
+                if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+                    console.error('Shader compilation failed:', this.gl.getShaderInfoLog(shader));
+                    this.gl.deleteShader(shader);
+                    return null;
+                }
+
+                return shader;
+            }
+
+            createGradientTexture() {
+                const gradients = {
+                    cosmic: ['#08008f', '#fa0020', '#ffcc2b'],
+                    ocean: ['#1a2980', '#26d0ce'],
+                    sunset: ['#ff6b6b', '#ffa726', '#ffeb3b'],
+                    forest: ['#134e5e', '#71b280'],
+                    neon: ['#ff006e', '#00f5ff'],
+                    aurora: ['#4facfe', '#00f2fe', '#43e97b']
+                };
+
+                const colors = gradients[this.currentGradient];
+                const width = 256;
+                const height = 1;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+
+                const gradient = ctx.createLinearGradient(0, 0, width, 0);
+                colors.forEach((color, i) => {
+                    gradient.addColorStop(i / (colors.length - 1), color);
+                });
+
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+
+                if (this.gradientTexture) {
+                    this.gl.deleteTexture(this.gradientTexture);
+                }
+
+                this.gradientTexture = this.gl.createTexture();
+                this.gl.bindTexture(this.gl.TEXTURE_2D, this.gradientTexture);
+                this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, canvas);
+                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+                this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+            }
+
+            async setupAudioContext() {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.analyser = this.audioContext.createAnalyser();
+                    this.analyser.fftSize = 1024;
+                    this.analyser.smoothingTimeConstant = 0.8;
+                    this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
+                } catch (error) {
+                    console.error('Failed to setup audio context:', error);
+                }
+            }
+
+            async loadAudioFile(file) {
+                try {
+                    if (!this.audioContext) {
+                        await this.setupAudioContext();
+                    }
+
+                    if (this.audioElement) {
+                        this.audioElement.pause();
+                        this.audioElement.src = '';
+                        this.audioElement = null;
+                    }
+
+                    try {
+                        console.log('Attempting ArrayBuffer loading...');
+                        await this.loadAudioWithArrayBuffer(file);
+                        return;
+                    } catch (arrayBufferError) {
+                        console.log('ArrayBuffer method failed, trying MediaElement method...', arrayBufferError.message);
+                    }
+
+                    await this.loadAudioWithMediaElement(file);
+
+                } catch (error) {
+                    console.error('All audio loading methods failed:', error);
+                    throw new Error('Could not load audio file. Try a different format or use demo mode.');
+                }
+            }
+
+            async loadAudioWithArrayBuffer(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    
+                    reader.onload = async (e) => {
+                        try {
+                            const arrayBuffer = e.target.result;
+                            console.log('File read successfully, decoding audio...');
+                            
+                            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                            console.log('Audio decoded successfully');
+                            
+                            this.audioBuffer = audioBuffer;
+                            this.createBufferSource();
+                            
+                            this.demoMode = false;
+                            document.getElementById('demoIndicator').style.display = 'none';
+                            document.getElementById('playPauseBtn').disabled = false;
+                            document.getElementById('playPauseBtn').textContent = '▶ Play';
+                            
+                            resolve();
+                        } catch (decodeError) {
+                            console.error('Audio decode error:', decodeError);
+                            reject(new Error('Could not decode audio file: ' + decodeError.message));
+                        }
+                    };
+                    
+                    reader.onerror = () => {
+                        reject(new Error('Could not read file'));
+                    };
+                    
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            createBufferSource() {
+                if (this.bufferSource) {
+                    this.bufferSource.disconnect();
+                }
+                
+                this.bufferSource = this.audioContext.createBufferSource();
+                this.bufferSource.buffer = this.audioBuffer;
+                this.bufferSource.loop = true;
+                
+                if (!this.gainNode) {
+                    this.gainNode = this.audioContext.createGain();
+                }
+                this.gainNode.gain.value = this.volume;
+                
+                this.bufferSource.connect(this.gainNode);
+                this.gainNode.connect(this.analyser);
+                this.analyser.connect(this.audioContext.destination);
+            }
+
+            async loadAudioWithMediaElement(file) {
+                this.audioElement = new Audio();
+                this.audioElement.crossOrigin = 'anonymous';
+                this.audioElement.volume = this.volume;
+                this.audioElement.loop = true;
+                
+                const url = URL.createObjectURL(file);
+                
+                return new Promise((resolve, reject) => {
+                    let resolved = false;
+                    
+                    const cleanup = () => {
+                        this.audioElement.removeEventListener('canplaythrough', onCanPlay);
+                        this.audioElement.removeEventListener('error', onError);
+                        URL.revokeObjectURL(url);
+                    };
+                    
+                    const onCanPlay = async () => {
+                        if (resolved) return;
+                        resolved = true;
+                        cleanup();
+                        
+                        try {
+                            const source = this.audioContext.createMediaElementSource(this.audioElement);
+                            
+                            if (!this.gainNode) {
+                                this.gainNode = this.audioContext.createGain();
+                            }
+                            this.gainNode.gain.value = this.volume;
+                            
+                            source.connect(this.gainNode);
+                            this.gainNode.connect(this.analyser);
+                            this.analyser.connect(this.audioContext.destination);
+                            
+                            if (this.audioContext.state === 'suspended') {
+                                await this.audioContext.resume();
+                            }
+                            
+                            this.demoMode = false;
+                            document.getElementById('demoIndicator').style.display = 'none';
+                            document.getElementById('playPauseBtn').disabled = false;
+                            document.getElementById('playPauseBtn').textContent = '▶ Play';
+                            
+                            resolve();
+                        } catch (error) {
+                            reject(new Error('Audio setup failed: ' + error.message));
+                        }
+                    };
+                    
+                    const onError = () => {
+                        if (resolved) return;
+                        resolved = true;
+                        cleanup();
+                        
+                        const errorMsg = this.audioElement.error ? 
+                            'Media error (code ' + this.audioElement.error.code + '): ' + this.getMediaErrorMessage(this.audioElement.error.code) : 
+                            'Unknown media error';
+                        reject(new Error(errorMsg));
+                    };
+                    
+                    this.audioElement.addEventListener('canplaythrough', onCanPlay);
+                    this.audioElement.addEventListener('error', onError);
+                    
+                    setTimeout(() => {
+                        if (!resolved) {
+                            resolved = true;
+                            cleanup();
+                            reject(new Error('Loading timeout'));
+                        }
+                    }, 15000);
+                    
+                    this.audioElement.src = url;
+                });
+            }
+
+            getMediaErrorMessage(errorCode) {
+                switch(errorCode) {
+                    case 1: return 'MEDIA_ERR_ABORTED - The video playback was aborted';
+                    case 2: return 'MEDIA_ERR_NETWORK - A network error caused the audio download to fail';
+                    case 3: return 'MEDIA_ERR_DECODE - The audio playback was aborted due to a corruption problem';
+                    case 4: return 'MEDIA_ERR_SRC_NOT_SUPPORTED - The audio format is not supported';
+                    default: return 'Unknown error';
+                }
+            }
+
+            updateAudioData() {
+                if (this.demoMode) {
+                    const time = Date.now() * 0.001;
+                    this.bassLevel = (Math.sin(time * 0.5) + 1) * 0.3 + Math.sin(time * 2) * 0.2;
+                    this.midLevel = (Math.sin(time * 1.2) + 1) * 0.25 + Math.sin(time * 3) * 0.15;
+                    this.highLevel = (Math.sin(time * 2.1) + 1) * 0.2 + Math.sin(time * 5) * 0.1;
+                    
+                    const bars = document.querySelectorAll('.freq-bar');
+                    bars.forEach((bar, i) => {
+                        const freq = Math.sin(time * (0.5 + i * 0.3)) * 0.5 + 0.5;
+                        bar.style.height = (freq * 50 + 5) + 'px';
+                    });
+                } else if (this.analyser) {
+                    this.analyser.getByteFrequencyData(this.frequencyData);
+                    
+                    const bassRange = this.frequencyData.slice(0, 8);
+                    const midRange = this.frequencyData.slice(8, 24);
+                    const highRange = this.frequencyData.slice(24, 32);
+                    
+                    this.bassLevel = bassRange.reduce((a, b) => a + b, 0) / (bassRange.length * 255);
+                    this.midLevel = midRange.reduce((a, b) => a + b, 0) / (midRange.length * 255);
+                    this.highLevel = highRange.reduce((a, b) => a + b, 0) / (highRange.length * 255);
+                    
+                    const bars = document.querySelectorAll('.freq-bar');
+                    bars.forEach((bar, i) => {
+                        const index = Math.floor((i / bars.length) * 32);
+                        const value = this.frequencyData[index] / 255;
+                        bar.style.height = (value * 50 + 2) + 'px';
+                    });
+                }
+            }
+
+            setupEventListeners() {
+                const audioFile = document.getElementById('audioFile');
+                const playPauseBtn = document.getElementById('playPauseBtn');
+                const volumeSlider = document.getElementById('volume');
+                const volumeValue = document.getElementById('volumeValue');
+                const sensitivitySlider = document.getElementById('sensitivity');
+                const sensitivityValue = document.getElementById('sensitivityValue');
+                const speedSlider = document.getElementById('speed');
+                const speedValue = document.getElementById('speedValue');
+                const gradientOptions = document.querySelectorAll('.gradient-option');
+                
+                // Check if elements exist
+                if (!audioFile || !playPauseBtn || !volumeSlider) {
+                    console.error('Required DOM elements not found');
+                    return;
+                }
+
+                audioFile.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const validTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/m4a'];
+                        const fileType = file.type;
+                        
+                        if (!validTypes.includes(fileType) && !file.name.match(/\.(mp3|wav|ogg|m4a)$/i)) {
+                            alert('Please select a valid audio file (MP3, WAV, OGG, or M4A)');
+                            return;
+                        }
+                        
+                        if (file.size > 100 * 1024 * 1024) {
+                            alert('File is too large. Please select a file smaller than 100MB.');
+                            return;
+                        }
+                        
+                        try {
+                            playPauseBtn.textContent = 'Loading...';
+                            playPauseBtn.disabled = true;
+                            await this.loadAudioFile(file);
+                            console.log('Audio file loaded successfully');
+                        } catch (error) {
+                            console.error('Failed to load audio file:', error.message);
+                            alert('Failed to load audio file: ' + error.message);
+                            this.demoMode = true;
+                            const demoIndicator = document.getElementById('demoIndicator');
+                            if (demoIndicator) demoIndicator.style.display = 'block';
+                            playPauseBtn.textContent = '▶ Start Demo';
+                            playPauseBtn.disabled = false;
+                        }
+                    }
+                });
+
+                playPauseBtn.addEventListener('click', async () => {
+                    if (this.audioContext && this.audioContext.state === 'suspended') {
+                        await this.audioContext.resume();
+                    }
+                    
+                    if (this.demoMode) {
+                        if (this.isPlaying) {
+                            this.isPlaying = false;
+                            playPauseBtn.textContent = '▶ Start Demo';
+                        } else {
+                            this.isPlaying = true;
+                            playPauseBtn.textContent = '⏸ Stop Demo';
+                        }
+                    } else if (this.audioBuffer) {
+                        try {
+                            if (this.isPlaying) {
+                                this.bufferSource.stop();
+                                this.isPlaying = false;
+                                playPauseBtn.textContent = '▶ Play';
+                            } else {
+                                this.createBufferSource();
+                                this.bufferSource.start();
+                                this.isPlaying = true;
+                                playPauseBtn.textContent = '⏸ Pause';
+                            }
+                        } catch (error) {
+                            console.error('Buffer playback error:', error);
+                            alert('Playback error: ' + error.message);
+                        }
+                    } else if (this.audioElement) {
+                        try {
+                            if (this.isPlaying) {
+                                this.audioElement.pause();
+                                this.isPlaying = false;
+                                playPauseBtn.textContent = '▶ Play';
+                            } else {
+                                await this.audioElement.play();
+                                this.isPlaying = true;
+                                playPauseBtn.textContent = '⏸ Pause';
+                            }
+                        } catch (error) {
+                            console.error('Element playback error:', error);
+                            alert('Playback error: ' + error.message);
+                        }
+                    }
+                });
+
+                if (volumeSlider && volumeValue) {
+                    volumeSlider.addEventListener('input', (e) => {
+                        this.volume = e.target.value / 100;
+                        volumeValue.textContent = e.target.value + '%';
+                        const volumeLabel = document.querySelector('label[for="volume"]');
+                        if (volumeLabel) volumeLabel.textContent = 'Volume: ' + e.target.value + '%';
+                        if (!this.isMuted) {
+                            this.setVolume(this.volume);
+                        }
+                    });
+                }
+
+                if (sensitivitySlider && sensitivityValue) {
+                    sensitivitySlider.addEventListener('input', (e) => {
+                        this.sensitivity = parseFloat(e.target.value);
+                        sensitivityValue.textContent = e.target.value + 'x';
+                    });
+                }
+
+                if (speedSlider && speedValue) {
+                    speedSlider.addEventListener('input', (e) => {
+                        this.speed = parseFloat(e.target.value);
+                        speedValue.textContent = e.target.value + 'x';
+                    });
+                }
+
+                gradientOptions.forEach(option => {
+                    option.addEventListener('click', () => {
+                        gradientOptions.forEach(opt => opt.classList.remove('active'));
+                        option.classList.add('active');
+                        this.currentGradient = option.dataset.gradient;
+                        this.createGradientTexture();
+                    });
+                });
+
+                window.addEventListener('resize', () => {
+                    this.setupCanvas();
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.target.tagName === 'INPUT') return;
+                    switch(e.key.toLowerCase()) {
+                        case 'm':
+                            e.preventDefault();
+                            this.toggleMute();
+                            break;
+                        case 'h':
+                            e.preventDefault();
+                            this.toggleUI();
+                            break;
+                    }
+                });
+            }
+
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                
+                if (this.isMuted) {
+                    this.volumeBeforeMute = this.volume;
+                    this.setVolume(0);
+                } else {
+                    this.setVolume(this.volumeBeforeMute || 0.7);
+                    document.getElementById('volume').value = (this.volumeBeforeMute || 0.7) * 100;
+                    document.getElementById('volumeValue').textContent = Math.round((this.volumeBeforeMute || 0.7) * 100) + '%';
+                }
+                
+                const volumeLabel = document.querySelector('label[for="volume"]');
+                if (this.isMuted) {
+                    volumeLabel.textContent = 'Volume (MUTED): ' + document.getElementById('volumeValue').textContent;
+                } else {
+                    volumeLabel.textContent = 'Volume: ' + document.getElementById('volumeValue').textContent;
+                }
+            }
+
+            setVolume(volume) {
+                this.volume = volume;
+                
+                if (this.gainNode) {
+                    this.gainNode.gain.value = this.volume;
+                } else if (this.audioElement) {
+                    this.audioElement.volume = this.volume;
+                }
+            }
+
+            toggleUI() {
+                this.isUIHidden = !this.isUIHidden;
+                
+                const elements = [
+                    document.querySelector('.controls'),
+                    document.querySelector('.frequency-bars'),
+                    document.querySelector('.info'),
+                    document.getElementById('demoIndicator')
+                ];
+                
+                elements.forEach(element => {
+                    if (element) {
+                        if (this.isUIHidden) {
+                            element.classList.add('hidden');
+                        } else {
+                            element.classList.remove('hidden');
+                        }
+                    }
+                });
+            }
+
+            render() {
+                if (!this.gl || !this.program) return;
+
+                this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                this.gl.clearColor(0, 0, 0, 1);
+                this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+
+                this.gl.useProgram(this.program);
+
+                const currentTime = (Date.now() - this.startTime) * 0.001;
+                this.gl.uniform1f(this.uniforms.time, currentTime);
+                this.gl.uniform2f(this.uniforms.resolution, this.canvas.width, this.canvas.height);
+                this.gl.uniform1f(this.uniforms.bassLevel, this.bassLevel);
+                this.gl.uniform1f(this.uniforms.midLevel, this.midLevel);
+                this.gl.uniform1f(this.uniforms.highLevel, this.highLevel);
+                this.gl.uniform1f(this.uniforms.sensitivity, this.sensitivity);
+                this.gl.uniform1f(this.uniforms.speed, this.speed);
+
+                this.gl.activeTexture(this.gl.TEXTURE0);
+                this.gl.bindTexture(this.gl.TEXTURE_2D, this.gradientTexture);
+                this.gl.uniform1i(this.uniforms.gradient, 0);
+
+                this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+            }
+
+            animate() {
+                this.updateAudioData();
+                this.render();
+                this.animationId = requestAnimationFrame(() => this.animate());
+            }
+
+            destroy() {
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                if (this.audioElement) {
+                    this.audioElement.pause();
+                }
+                if (this.audioContext) {
+                    this.audioContext.close();
+                }
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            visualizer = new WebGLAudioVisualizer();
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (visualizer) {
+                visualizer.destroy();
+            }
+        });
+    </script>
+</body>
+</html>
