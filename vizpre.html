@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viz</title>
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; }
+        canvas { width: 100vw; height: 80vh; display: block; }
+        #controls { position: absolute; top: 10px; text-align: center; }
+        input, button, select { margin: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h1>Viz</h1>
+        <input type="file" id="audioInput" accept="audio/*">
+        <button id="playButton" onclick="playAudio()">Play</button>
+        <select id="modeSelect" onchange="updateMode()">
+            <option value="0">Warped Torus</option>
+            <option value="1">Fluid Waves</option>
+            <option value="2">Particle Field</option>
+            <option value="3">Plasma Pulse</option>
+            <option value="4">Morphing Polyhedra</option>
+            <option value="5">Blurred Tunnel</option>
+            <option value="6">Fractal Spire</option>
+            <option value="7">Glowing Orbs</option>
+            <option value="8">Neon Grid</option>
+            <option value="9">Liquid Metal</option>
+            <option value="10">Vortex Swarm</option>
+            <option value="11">Crystal Lattice</option>
+            <option value="12">Plasma Globe</option>
+            <option value="13">Fractal Cube</option>
+            <option value="14">Starfield Warp</option>
+            <option value="15">Holo Spheres</option>
+        </select>
+    </div>
+    <canvas id="visualizer"></canvas>
+    <script>
+        const canvas = document.getElementById('visualizer');
+        const gl = canvas.getContext('webgl');
+        const audioInput = document.getElementById('audioInput');
+        const playButton = document.getElementById('playButton');
+        const modeSelect = document.getElementById('modeSelect');
+        const controls = document.getElementById('controls');
+        let audioContext, analyser, source, frequencyData, audio = null, isPlaying = false;
+        let isWebGLInitialized = false;
+        let lastBass = 0, beatPulse = 0;
+        let currentMode = 0;
+
+        // Resize canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight * 0.8;
+            if (gl && isWebGLInitialized) gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'm' && audio) {
+                audio.muted = !audio.muted;
+                console.log('Audio muted:', audio.muted);
+            }
+            if (e.key === 'h') {
+                controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
+                console.log('Controls visibility:', controls.style.display);
+            }
+        });
+
+        // Update visualization mode
+        function updateMode() {
+            currentMode = parseInt(modeSelect.value);
+            console.log('Visualization mode:', modeSelect.options[currentMode].text);
+        }
+
+        // WebGL setup
+        function initWebGL() {
+            if (!gl) {
+                alert('WebGL not supported. Please use a modern browser like Chrome or Firefox.');
+                console.error('WebGL not supported');
+                return false;
+            }
+
+            // Vertex Shader
+            const vertexShaderSource = `
+                attribute vec2 a_position;
+                void main() {
+                    gl_Position = vec4(a_position, 0.0, 1.0);
+                }
+            `;
+
+            // Fragment Shader (enhanced with 16 modes)
+            const fragmentShaderSource = `
+                precision mediump float;
+                uniform vec2 u_resolution;
+                uniform float u_time;
+                uniform float u_bass;
+                uniform float u_mids;
+                uniform float u_treble;
+                uniform float u_beat;
+                uniform float u_mode;
+
+                float torusSDF(vec3 p, vec2 t) {
+                    vec2 q = vec2(length(p.xy) - t.x, p.z);
+                    return length(q) - t.y;
+                }
+
+                float sphereSDF(vec3 p, float r) {
+                    return length(p) - r;
+                }
+
+                float boxSDF(vec3 p, vec3 b) {
+                    vec3 q = abs(p) - b;
+                    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+                }
+
+                float tunnelSDF(vec3 p) {
+                    float r = 0.5 + u_bass * 0.2 + sin(p.z * 0.3 + u_time * 0.5) * 0.15;
+                    return length(p.xy) - r;
+                }
+
+                vec3 rotate(vec3 p, float angle) {
+                    float c = cos(angle), s = sin(angle);
+                    return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
+                }
+
+                float noise(vec2 uv) {
+                    return fract(sin(dot(uv, vec2(127.1, 311.7))) * 43758.5453);
+                }
+
+                vec2 kaleidoscope(vec2 uv, float n) {
+                    float a = atan(uv.y, uv.x);
+                    a = mod(a * n / 3.14159, 2.0) - 1.0;
+                    a = abs(a);
+                    float r = length(uv);
+                    return vec2(cos(a * 3.14159 / n) * r, sin(a * 3.14159 / n) * r);
+                }
+
+                float fractalNoise(vec2 uv) {
+                    float n = 0.0;
+                    n += noise(uv) * 0.5;
+                    n += noise(uv * 2.0) * 0.25;
+                    n += noise(uv * 4.0) * 0.125;
+                    return n;
+                }
+
+                float spireSDF(vec3 p) {
+                    p = rotate(p, u_time * 0.2);
+                    float d = length(p.xy) - 0.3 * (1.0 + u_bass * 0.5);
+                    d += sin(p.z * 5.0 + u_time) * 0.1;
+                    return d;
+                }
+
+                float gridSDF(vec3 p) {
+                    vec3 q = fract(p * 2.0) - 0.5;
+                    return min(min(length(q.xy), length(q.yz)), length(q.xz)) - 0.05;
+                }
+
+                void main() {
+                    vec2 uv = gl_FragCoord.xy / u_resolution - 0.5;
+                    uv.x *= u_resolution.x / u_resolution.y;
+                    vec3 col = vec3(0.0);
+
+                    // Common transformations
+                    uv = kaleidoscope(uv, 4.0 + u_mids * 6.0);
+                    uv += sin(uv.y * 12.0 + u_time + u_treble * 5.0) * 0.05 * u_treble;
+                    uv += cos(uv.x * 10.0 + u_time * 0.5 + u_bass * 3.0) * 0.05 * u_bass;
+
+                    if (u_mode == 0.0) { // Warped Torus
+                        vec3 ro = vec3(0.0, 0.0, 3.0 + u_beat);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float angle = u_time * 0.4 + u_mids * 1.5;
+                        ro = rotate(ro, angle);
+                        rd = rotate(rd, angle);
+                        float t = 0.0;
+                        float morph = 0.5 + 0.5 * sin(u_time * 0.3 + u_beat);
+                        for (int i = 0; i < 48; i++) {
+                            vec3 p = ro + rd * t;
+                            float d1 = torusSDF(p, vec2(1.0 + u_bass * 0.4, 0.3));
+                            float d2 = sphereSDF(p, 1.0 + u_bass * 0.3);
+                            float d = mix(d1, d2, morph);
+                            float n = fractalNoise(p.xy * 0.5 + u_time * 0.1) * 0.1;
+                            d += n;
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.2 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                ) * (1.0 - t * 0.15);
+                                col += vec3(0.2, 0.1, 0.3) * u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 15.0) break;
+                        }
+                        vec2 uvBlur = uv + normalize(uv) * 0.01 * u_treble;
+                        col += vec3(0.1, 0.05, 0.15) * noise(uvBlur * 10.0) * u_treble * 0.2;
+                    } else if (u_mode == 1.0) { // Fluid Waves
+                        vec2 uvBlur = uv + vec2(0.0, 0.02 * u_treble);
+                        vec3 ro = vec3(uvBlur, 1.0);
+                        vec3 rd = normalize(vec3(0.0, 0.0, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            float wave = sin(p.x * 10.0 + u_time + u_bass * 5.0) * cos(p.y * 8.0 + u_time * 0.7) * (0.2 + u_bass);
+                            float d = p.z - wave;
+                            if (d < 0.001) {
+                                float hue = mod(wave + u_time * 0.1 + u_beat, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col *= 1.0 + u_beat * 0.7;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                    } else if (u_mode == 2.0) { // Particle Field
+                        vec3 ro = vec3(0.0, 0.0, 3.0 + u_beat);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            p = rotate(p, u_time * 0.2 + u_mids);
+                            float d = 1000.0;
+                            for (int j = 0; j < 3; j++) {
+                                vec3 center = vec3(
+                                    sin(u_time * 0.5 + float(j) * 2.0) * (0.5 + u_mids),
+                                    cos(u_time * 0.3 + float(j) * 2.0) * (0.5 + u_mids),
+                                    sin(u_time * 0.4 + float(j) * 2.0)
+                                );
+                                d = min(d, sphereSDF(p - center, 0.3 + u_treble * 0.2));
+                            }
+                            d -= u_beat * 0.1;
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.1 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col *= 1.0 - t * 0.2;
+                                col *= 1.0 + u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                    } else if (u_mode == 3.0) { // Plasma Pulse
+                        vec2 uvBlur = uv + vec2(0.02 * u_treble, 0.0);
+                        vec3 ro = vec3(uvBlur, 1.0);
+                        vec3 rd = normalize(vec3(0.0, 0.0, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            float plasma = sin(length(p.xy) * 15.0 + u_time * 0.7 + u_bass * 4.0) * (0.3 + u_bass);
+                            plasma += cos(p.x * 10.0 + u_time * 0.5 + u_treble * 3.0) * 0.2;
+                            float d = p.z - plasma;
+                            if (d < 0.001) {
+                                float hue = mod(plasma + u_time * 0.1 + u_beat, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col *= 1.0 + u_beat * 0.5;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                    } else if (u_mode == 4.0) { // Morphing Polyhedra
+                        vec3 ro = vec3(0.0, 0.0, 3.0 + u_beat);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float angle = u_time * 0.3 + u_mids;
+                        ro = rotate(ro, angle);
+                        rd = rotate(rd, angle);
+                        float t = 0.0;
+                        float morph = 0.5 + 0.5 * sin(u_time * 0.4 + u_beat);
+                        for (int i = 0; i < 48; i++) {
+                            vec3 p = ro + rd * t;
+                            float d1 = boxSDF(p, vec3(1.0 + u_bass * 0.3));
+                            float d2 = sphereSDF(p, 1.2 + u_bass * 0.2);
+                            float d = mix(d1, d2, morph);
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.2 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                ) * (1.0 - t * 0.15);
+                                col += vec3(0.3, 0.2, 0.1) * u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 15.0) break;
+                        }
+                    } else if (u_mode == 5.0) { // Blurred Tunnel
+                        vec3 ro = vec3(0.0, 0.0, -u_time);
+                        vec3 rd = normalize(vec3(uv, -2.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 64; i++) {
+                            vec3 p = ro + rd * t;
+                            float d = tunnelSDF(p);
+                            if (d < 0.001) {
+                                vec2 uvTex = vec2(atan(p.y, p.x) * 2.0 + u_time * 0.3, p.z * 0.2);
+                                float n = fractalNoise(uvTex + u_mids * 0.5) * (0.5 + u_treble * 0.5);
+                                float hue = mod(n + u_time * 0.2 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                vec2 uvBlur = uv + normalize(uv) * 0.02 * (u_mids + u_beat);
+                                col += vec3(0.1, 0.05, 0.15) * noise(uvBlur * 10.0) * u_treble * 0.3;
+                                col *= 1.0 - t * 0.05;
+                                col *= 1.0 + u_beat * 0.5;
+                                break;
+                            }
+                            t += d * 0.2;
+                            if (t > 30.0) break;
+                        }
+                    } else if (u_mode == 6.0) { // Fractal Spire
+                        vec3 ro = vec3(0.0, 0.0, 3.0 + u_beat);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float angle = u_time * 0.3 + u_mids;
+                        ro = rotate(ro, angle);
+                        rd = rotate(rd, angle);
+                        float t = 0.0;
+                        for (int i = 0; i < 48; i++) {
+                            vec3 p = ro + rd * t;
+                            float d = spireSDF(p);
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.2 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                ) * (1.0 - t * 0.15);
+                                col *= 1.0 + u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 15.0) break;
+                        }
+                    } else if (u_mode == 7.0) { // Glowing Orbs
+                        vec3 ro = vec3(0.0, 0.0, 3.0);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            float d = 1000.0;
+                            for (int j = 0; j < 4; j++) {
+                                vec3 center = vec3(
+                                    sin(u_time * 0.4 + float(j) * 1.5) * (0.7 + u_mids),
+                                    cos(u_time * 0.5 + float(j) * 1.5) * (0.7 + u_mids),
+                                    sin(u_time * 0.3 + float(j) * 1.5) * 0.5
+                                );
+                                d = min(d, sphereSDF(p - center, 0.2 + u_treble * 0.1));
+                            }
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.1 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col += vec3(0.3, 0.2, 0.1) * u_beat;
+                                col *= 1.0 - t * 0.2;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                    } else if (u_mode == 8.0) { // Neon Grid
+                        vec3 ro = vec3(0.0, 0.0, 3.0 + u_beat);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            p = rotate(p, u_time * 0.2 + u_mids);
+                            float d = gridSDF(p);
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.1 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col *= 1.0 + u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                    } else if (u_mode == 9.0) { // Liquid Metal
+                        vec3 ro = vec3(uv, 1.0);
+                        vec3 rd = normalize(vec3(0.0, 0.0, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            float wave = sin(p.x * 8.0 + u_time + u_bass * 4.0) * cos(p.y * 6.0 + u_time * 0.5) * (0.2 + u_bass);
+                            wave += fractalNoise(p.xy * 0.5 + u_time * 0.2) * u_treble * 0.2;
+                            float d = p.z - wave;
+                            if (d < 0.001) {
+                                float hue = mod(wave + u_time * 0.1 + u_beat, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col *= 1.0 + u_beat * 0.7;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                    } else if (u_mode == 10.0) { // Vortex Swarm
+                        vec3 ro = vec3(0.0, 0.0, 3.0 + u_beat);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            p = rotate(p, u_time * 0.5 + u_mids * 2.0);
+                            float d = length(p.xy) - 0.3 * (1.0 + u_treble * 0.5);
+                            d += sin(length(p) * 5.0 + u_time) * 0.1;
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.1 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col *= 1.0 - t * 0.2;
+                                col *= 1.0 + u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                        vec2 uvBlur = uv + normalize(uv) * 0.02 * u_mids;
+                        col += vec3(0.1, 0.05, 0.15) * noise(uvBlur * 10.0) * u_treble * 0.2;
+                    } else if (u_mode == 11.0) { // Crystal Lattice
+                        vec3 ro = vec3(0.0, 0.0, 3.0 + u_beat);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float angle = u_time * 0.3 + u_mids;
+                        ro = rotate(ro, angle);
+                        rd = rotate(rd, angle);
+                        float t = 0.0;
+                        float morph = 0.5 + 0.5 * sin(u_time * 0.4 + u_beat);
+                        for (int i = 0; i < 48; i++) {
+                            vec3 p = ro + rd * t;
+                            float d1 = boxSDF(p, vec3(0.8 + u_bass * 0.2));
+                            float d2 = sphereSDF(p, 1.0 + u_bass * 0.2);
+                            float d = mix(d1, d2, morph);
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.2 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                ) * (1.0 - t * 0.15);
+                                col *= 1.0 + u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 15.0) break;
+                        }
+                    } else if (u_mode == 12.0) { // Plasma Globe
+                        vec3 ro = vec3(0.0, 0.0, 3.0);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            float d = sphereSDF(p, 1.0 + u_bass * 0.3);
+                            d += sin(p.x * 5.0 + u_time) * sin(p.y * 5.0 + u_time) * 0.1 * u_treble;
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.1 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col *= 1.0 + u_beat * 0.5;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                    } else if (u_mode == 13.0) { // Fractal Cube
+                        vec3 ro = vec3(0.0, 0.0, 3.0 + u_beat);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 48; i++) {
+                            vec3 p = ro + rd * t;
+                            p = rotate(p, u_time * 0.3 + u_mids);
+                            float d = boxSDF(p, vec3(1.0 + u_bass * 0.3));
+                            d += fractalNoise(p.xy * 0.5 + u_time * 0.1) * 0.1;
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.2 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                ) * (1.0 - t * 0.15);
+                                col *= 1.0 + u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 15.0) break;
+                        }
+                    } else if (u_mode == 14.0) { // Starfield Warp
+                        vec3 ro = vec3(0.0, 0.0, u_time * 0.5);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            float d = length(fract(p * 0.5) - 0.5) - 0.05 * (1.0 + u_mids);
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.1 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col *= 1.0 - t * 0.2;
+                                col *= 1.0 + u_beat;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 20.0) break;
+                        }
+                    } else if (u_mode == 15.0) { // Holo Spheres
+                        vec3 ro = vec3(0.0, 0.0, 3.0);
+                        vec3 rd = normalize(vec3(uv, -1.0));
+                        float t = 0.0;
+                        for (int i = 0; i < 32; i++) {
+                            vec3 p = ro + rd * t;
+                            float d = 1000.0;
+                            for (int j = 0; j < 3; j++) {
+                                vec3 center = vec3(
+                                    sin(u_time * 0.4 + float(j) * 2.0) * 0.5,
+                                    cos(u_time * 0.4 + float(j) * 2.0) * 0.5,
+                                    sin(u_time * 0.3 + float(j) * 2.0) * 0.5
+                                );
+                                d = min(d, sphereSDF(p - center, 0.3 + u_treble * 0.1));
+                            }
+                            if (d < 0.001) {
+                                float hue = mod(u_time * 0.1 + u_treble, 1.0);
+                                col = vec3(
+                                    0.5 + 0.5 * sin(hue * 6.28),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 2.09),
+                                    0.5 + 0.5 * sin(hue * 6.28 + 4.18)
+                                );
+                                col += vec3(0.1, 0.2, 0.3) * fractalNoise(p.xy * 0.5 + u_time * 0.1);
+                                col *= 1.0 + u_beat * 0.5;
+                                break;
+                            }
+                            t += d * 0.5;
+                            if (t > 10.0) break;
+                        }
+                    }
+
+                    gl_FragColor = vec4(col, 1.0);
+                }
+            `;
+
+            // Compile shader
+            function createShader(type, source) {
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                    gl.deleteShader(shader);
+                    return null;
+                }
+                return shader;
+            }
+
+            const vertexShader = createShader(gl.VERTEX_SHADER, vertexShaderSource);
+            if (!vertexShader) {
+                console.error('Vertex shader compilation failed');
+                return false;
+            }
+            const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+            if (!fragmentShader) {
+                console.error('Fragment shader compilation failed');
+                return false;
+            }
+
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Program link error:', gl.getProgramInfoLog(program));
+                return false;
+            }
+            gl.useProgram(program);
+
+            // Set up geometry (full-screen quad)
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            const positions = new Float32Array([
+                -1, -1,  1, -1,  -1,  1,
+                 1, -1,  1,  1,  -1,  1
+            ]);
+            gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+            const positionLocation = gl.getAttribLocation(program, 'a_position');
+            gl.enableVertexAttribArray(positionLocation);
+            gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+            // Uniform locations
+            const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
+            const timeLocation = gl.getUniformLocation(program, 'u_time');
+            const bassLocation = gl.getUniformLocation(program, 'u_bass');
+            const midsLocation = gl.getUniformLocation(program, 'u_mids');
+            const trebleLocation = gl.getUniformLocation(program, 'u_treble');
+            const beatLocation = gl.getUniformLocation(program, 'u_beat');
+            const modeLocation = gl.getUniformLocation(program, 'u_mode');
+
+            // Store uniform locations globally
+            window.visualizer = { resolutionLocation, timeLocation, bassLocation, midsLocation, trebleLocation, beatLocation, modeLocation };
+
+            console.log('WebGL initialized');
+            return true;
+        }
+
+        // Initialize WebGL
+        isWebGLInitialized = initWebGL();
+
+        function setupAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 512;
+            frequencyData = new Uint8Array(analyser.frequencyBinCount);
+            console.log('Audio context initialized');
+        }
+
+        function playAudio() {
+            if (!audioInput.files[0] && !audio) {
+                alert('Please select an audio file!');
+                return;
+            }
+
+            if (!audio) {
+                audio = new Audio(URL.createObjectURL(audioInput.files[0]));
+                audio.crossOrigin = 'anonymous';
+                if (!audioContext) setupAudio();
+                source = audioContext.createMediaElementSource(audio);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                audio.play();
+                isPlaying = true;
+                playButton.textContent = 'Pause';
+                if (isWebGLInitialized) animate();
+            } else if (isPlaying) {
+                audio.pause();
+                isPlaying = false;
+                playButton.textContent = 'Play';
+            } else {
+                audio.play();
+                isPlaying = true;
+                playButton.textContent = 'Pause';
+                if (isWebGLInitialized) animate();
+            }
+        }
+
+        function animate() {
+            if (!isPlaying || !isWebGLInitialized) return;
+            requestAnimationFrame(animate);
+            analyser.getByteFrequencyData(frequencyData);
+
+            // Audio analysis
+            const bass = frequencyData.slice(0, 50).reduce((a, b) => a + b, 0) / (50 * 255);
+            const mids = frequencyData.slice(50, 150).reduce((a, b) => a + b, 0) / (100 * 255);
+            const treble = frequencyData.slice(150, 256).reduce((a, b) => a + b, 0) / (106 * 255);
+
+            // Beat detection
+            if (bass > lastBass + 0.2 && bass > 0.5) {
+                beatPulse = 1.0;
+            }
+            beatPulse *= 0.9;
+            lastBass = bass;
+
+            // Update uniforms
+            gl.uniform2f(window.visualizer.resolutionLocation, canvas.width, canvas.height);
+            gl.uniform1f(window.visualizer.timeLocation, performance.now() * 0.001);
+            gl.uniform1f(window.visualizer.bassLocation, bass);
+            gl.uniform1f(window.visualizer.midsLocation, mids);
+            gl.uniform1f(window.visualizer.trebleLocation, treble);
+            gl.uniform1f(window.visualizer.beatLocation, beatPulse);
+            gl.uniform1f(window.visualizer.modeLocation, currentMode);
+
+            // Render
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            console.log('Rendering frame');
+        }
+    </script>
+</body>
+</html>
