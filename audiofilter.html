@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Filter Playground</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 900px;
+            width: 95%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3)); }
+            to { filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.6)); }
+        }
+
+        .upload-section {
+            margin: 2rem 0;
+            padding: 2rem;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            color: white;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            font-weight: bold;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .audio-info {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            display: none;
+        }
+
+        .visualizer {
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+
+        .waveform {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+        }
+
+        .playback-controls {
+            margin: 2rem 0;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .play-btn {
+            background: linear-gradient(45deg, #45b7d1, #96c93d);
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            color: white;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            min-width: 120px;
+        }
+
+        .play-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .play-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 1.5rem 0;
+        }
+
+        .control-group h3 {
+            margin-bottom: 1rem;
+            color: #4ecdc4;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .slider-container {
+            margin: 1rem 0;
+        }
+
+        .slider-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            cursor: pointer;
+            border: none;
+        }
+
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .preset-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .preset-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .preset-btn.active {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Audio Filter Playground</h1>
+        
+        <div class="upload-section">
+            <input type="file" id="audioFile" class="file-input" accept="audio/*">
+            <button class="upload-btn" onclick="document.getElementById('audioFile').click()">
+                📁 Upload Audio File
+            </button>
+            <p style="margin-top: 1rem; opacity: 0.8;">Supports MP3, WAV, OGG, M4A, and more</p>
+        </div>
+
+        <div class="audio-info" id="audioInfo">
+            <p id="fileName"></p>
+            <p id="fileDuration"></p>
+        </div>
+
+        <div class="visualizer">
+            <canvas class="waveform" id="waveform"></canvas>
+        </div>
+
+        <div class="playback-controls">
+            <button class="play-btn" id="playBtn" disabled>▶️ Play</button>
+            <button class="play-btn" id="stopBtn" disabled>⏹️ Stop</button>
+        </div>
+
+        <div class="control-group">
+            <h3>🎯 Quick Presets</h3>
+            <div class="preset-buttons">
+                <button class="preset-btn active" onclick="applyPreset('original')">Original</button>
+                <button class="preset-btn" onclick="applyPreset('lofi')">Lo-Fi</button>
+                <button class="preset-btn" onclick="applyPreset('reverb')">Reverb Hall</button>
+                <button class="preset-btn" onclick="applyPreset('chipmunk')">Chipmunk</button>
+                <button class="preset-btn" onclick="applyPreset('deep')">Deep Voice</button>
+                <button class="preset-btn" onclick="applyPreset('radio')">Radio</button>
+                <button class="preset-btn" onclick="applyPreset('underwater')">Underwater</button>
+                <button class="preset-btn" onclick="applyPreset('phone')">Phone Call</button>
+                <button class="preset-btn" onclick="applyPreset('robot')">Robot</button>
+                <button class="preset-btn" onclick="applyPreset('cave')">Cave Echo</button>
+                <button class="preset-btn" onclick="applyPreset('nightclub')">Nightclub</button>
+                <button class="preset-btn" onclick="applyPreset('vintage')">Vintage</button>
+                <button class="preset-btn" onclick="applyPreset('space')">Space</button>
+                <button class="preset-btn" onclick="applyPreset('walkie')">Walkie-Talkie</button>
+                <button class="preset-btn" onclick="applyPreset('cathedral')">Cathedral</button>
+                <button class="preset-btn" onclick="applyPreset('nightmare')">Nightmare</button>
+                <button class="preset-btn" onclick="applyPreset('dub')">Dub</button>
+                <button class="preset-btn" onclick="applyPreset('vaporwave')">Vaporwave</button>
+                <button class="preset-btn" onclick="applyPreset('8bit')">8-bit</button>
+                <button class="preset-btn" onclick="applyPreset('ambient')">Ambient</button>
+                <button class="preset-btn" onclick="applyPreset('demon')">Demon</button>
+                <button class="preset-btn" onclick="applyPreset('alien')">Alien</button>
+                <button class="preset-btn" onclick="applyPreset('elderly')">Elderly</button>
+                <button class="preset-btn" onclick="applyPreset('baby')">Baby</button>
+                <button class="preset-btn" onclick="applyPreset('stadium')">Stadium</button>
+                <button class="preset-btn" onclick="applyPreset('bathroom')">Bathroom</button>
+                <button class="preset-btn" onclick="applyPreset('forest')">Forest</button>
+                <button class="preset-btn" onclick="applyPreset('windtunnel')">Wind Tunnel</button>
+                <button class="preset-btn" onclick="applyPreset('cbradio')">CB Radio</button>
+                <button class="preset-btn" onclick="applyPreset('megaphone')">Megaphone</button>
+                <button class="preset-btn" onclick="applyPreset('intercom')">Intercom</button>
+                <button class="preset-btn" onclick="applyPreset('drivethru')">Drive-Thru</button>
+                <button class="preset-btn" onclick="applyPreset('helicopter')">Helicopter</button>
+                <button class="preset-btn" onclick="applyPreset('brokenspeaker')">Broken Speaker</button>
+                <button class="preset-btn" onclick="applyPreset('gramophone')">Gramophone</button>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <h3>🎚️ Basic Controls</h3>
+                <div class="slider-container">
+                    <label class="slider-label">Volume: <span id="volumeValue">100%</span></label>
+                    <input type="range" class="slider" id="volume" min="0" max="100" value="100">
+                </div>
+                <div class="slider-container">
+                    <label class="slider-label">Playback Rate: <span id="playbackRateValue">1.0x</span></label>
+                    <input type="range" class="slider" id="playbackRate" min="0.25" max="2" step="0.05" value="1">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>🎭 Pitch & Time</h3>
+                <div class="slider-container">
+                    <label class="slider-label">Pitch Shift: <span id="pitchShiftValue">0</span></label>
+                    <input type="range" class="slider" id="pitchShift" min="-12" max="12" step="0.1" value="0">
+                </div>
+                <div class="slider-container">
+                    <label class="slider-label">Detune: <span id="detuneValue">0¢</span></label>
+                    <input type="range" class="slider" id="detune" min="-100" max="100" value="0">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>🌊 Reverb & Space</h3>
+                <div class="slider-container">
+                    <label class="slider-label">Reverb: <span id="reverbValue">0%</span></label>
+                    <input type="range" class="slider" id="reverb" min="0" max="100" value="0">
+                </div>
+                <div class="slider-container">
+                    <label class="slider-label">Room Size: <span id="roomSizeValue">50%</span></label>
+                    <input type="range" class="slider" id="roomSize" min="0" max="100" value="50">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>🎛️ Distortion & Lo-Fi</h3>
+                <div class="slider-container">
+                    <label class="slider-label">Distortion: <span id="distortionValue">0%</span></label>
+                    <input type="range" class="slider" id="distortion" min="0" max="100" value="0">
+                </div>
+                <div class="slider-container">
+                    <label class="slider-label">Bitcrusher: <span id="bitcrushValue">16-bit</span></label>
+                    <input type="range" class="slider" id="bitcrush" min="1" max="16" value="16">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>🎵 EQ & Filters</h3>
+                <div class="slider-container">
+                    <label class="slider-label">Low-Pass Filter: <span id="lowpassValue">20000 Hz</span></label>
+                    <input type="range" class="slider" id="lowpass" min="100" max="20000" value="20000">
+                </div>
+                <div class="slider-container">
+                    <label class="slider-label">High-Pass Filter: <span id="highpassValue">0 Hz</span></label>
+                    <input type="range" class="slider" id="highpass" min="0" max="1000" value="0">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>✨ Effects</h3>
+                <div class="slider-container">
+                    <label class="slider-label">Chorus: <span id="chorusValue">0%</span></label>
+                    <input type="range" class="slider" id="chorus" min="0" max="100" value="0">
+                </div>
+                <div class="slider-container">
+                    <label class="slider-label">Delay: <span id="delayValue">0%</span></label>
+                    <input type="range" class="slider" id="delay" min="0" max="100" value="0">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioContext;
+        let audioBuffer;
+        let currentSource;
+        let currentGain;
+        let isPlaying = false;
+
+        // Preset configurations
+        const presets = {
+            original: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 0, roomSize: 50, distortion: 0, bitcrush: 16,
+                lowpass: 20000, highpass: 0, chorus: 0, delay: 0
+            },
+            lofi: {
+                playbackRate: 0.95, pitchShift: -0.5, detune: -5,
+                reverb: 15, roomSize: 30, distortion: 25, bitcrush: 8,
+                lowpass: 3000, highpass: 80, chorus: 0, delay: 10
+            },
+            reverb: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 80, roomSize: 90, distortion: 0, bitcrush: 16,
+                lowpass: 20000, highpass: 0, chorus: 20, delay: 5
+            },
+            chipmunk: {
+                playbackRate: 1.5, pitchShift: 8, detune: 20,
+                reverb: 5, roomSize: 20, distortion: 5, bitcrush: 16,
+                lowpass: 8000, highpass: 200, chorus: 15, delay: 0
+            },
+            deep: {
+                playbackRate: 0.7, pitchShift: -8, detune: -30,
+                reverb: 40, roomSize: 70, distortion: 10, bitcrush: 16,
+                lowpass: 2000, highpass: 50, chorus: 0, delay: 20
+            },
+            radio: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 5, roomSize: 20, distortion: 15, bitcrush: 12,
+                lowpass: 4000, highpass: 300, chorus: 0, delay: 0
+            },
+            underwater: {
+                playbackRate: 0.85, pitchShift: -3, detune: -10,
+                reverb: 60, roomSize: 95, distortion: 0, bitcrush: 16,
+                lowpass: 800, highpass: 0, chorus: 30, delay: 40
+            },
+            phone: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 0, roomSize: 10, distortion: 20, bitcrush: 8,
+                lowpass: 3400, highpass: 300, chorus: 0, delay: 0
+            },
+            robot: {
+                playbackRate: 1, pitchShift: -2, detune: 0,
+                reverb: 10, roomSize: 30, distortion: 40, bitcrush: 6,
+                lowpass: 5000, highpass: 150, chorus: 0, delay: 15
+            },
+            cave: {
+                playbackRate: 0.9, pitchShift: -1, detune: 0,
+                reverb: 95, roomSize: 100, distortion: 0, bitcrush: 16,
+                lowpass: 6000, highpass: 100, chorus: 5, delay: 60
+            },
+            nightclub: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 30, roomSize: 60, distortion: 5, bitcrush: 16,
+                lowpass: 15000, highpass: 40, chorus: 40, delay: 25
+            },
+            vintage: {
+                playbackRate: 0.98, pitchShift: -0.3, detune: -3,
+                reverb: 25, roomSize: 40, distortion: 30, bitcrush: 10,
+                lowpass: 5000, highpass: 120, chorus: 10, delay: 8
+            },
+            space: {
+                playbackRate: 0.8, pitchShift: -4, detune: -20,
+                reverb: 85, roomSize: 95, distortion: 0, bitcrush: 16,
+                lowpass: 8000, highpass: 50, chorus: 60, delay: 80
+            },
+            walkie: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 0, roomSize: 15, distortion: 35, bitcrush: 6,
+                lowpass: 2800, highpass: 400, chorus: 0, delay: 0
+            },
+            cathedral: {
+                playbackRate: 0.95, pitchShift: 0, detune: 0,
+                reverb: 100, roomSize: 100, distortion: 0, bitcrush: 16,
+                lowpass: 12000, highpass: 80, chorus: 15, delay: 50
+            },
+            nightmare: {
+                playbackRate: 0.6, pitchShift: -10, detune: -40,
+                reverb: 70, roomSize: 85, distortion: 60, bitcrush: 4,
+                lowpass: 1500, highpass: 200, chorus: 20, delay: 90
+            },
+            // Music Genre Presets
+            dub: {
+                playbackRate: 0.9, pitchShift: -2, detune: 0,
+                reverb: 50, roomSize: 80, distortion: 5, bitcrush: 16,
+                lowpass: 2500, highpass: 60, chorus: 10, delay: 70
+            },
+            vaporwave: {
+                playbackRate: 0.75, pitchShift: -3, detune: -15,
+                reverb: 70, roomSize: 85, distortion: 8, bitcrush: 12,
+                lowpass: 4000, highpass: 0, chorus: 25, delay: 30
+            },
+            '8bit': {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 5, roomSize: 20, distortion: 15, bitcrush: 4,
+                lowpass: 8000, highpass: 300, chorus: 0, delay: 5
+            },
+            ambient: {
+                playbackRate: 0.8, pitchShift: -1, detune: 0,
+                reverb: 90, roomSize: 95, distortion: 0, bitcrush: 16,
+                lowpass: 6000, highpass: 30, chorus: 50, delay: 60
+            },
+            // Character/Voice Presets
+            demon: {
+                playbackRate: 0.5, pitchShift: -12, detune: -50,
+                reverb: 80, roomSize: 90, distortion: 70, bitcrush: 8,
+                lowpass: 1200, highpass: 100, chorus: 0, delay: 40
+            },
+            alien: {
+                playbackRate: 1.2, pitchShift: 5, detune: 30,
+                reverb: 40, roomSize: 60, distortion: 25, bitcrush: 10,
+                lowpass: 7000, highpass: 400, chorus: 35, delay: 20
+            },
+            elderly: {
+                playbackRate: 0.95, pitchShift: -1, detune: -5,
+                reverb: 10, roomSize: 30, distortion: 5, bitcrush: 12,
+                lowpass: 3500, highpass: 80, chorus: 0, delay: 0
+            },
+            baby: {
+                playbackRate: 1.3, pitchShift: 6, detune: 15,
+                reverb: 15, roomSize: 25, distortion: 0, bitcrush: 16,
+                lowpass: 8000, highpass: 200, chorus: 10, delay: 0
+            },
+            // Environmental Presets
+            stadium: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 95, roomSize: 100, distortion: 0, bitcrush: 16,
+                lowpass: 15000, highpass: 50, chorus: 20, delay: 80
+            },
+            bathroom: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 60, roomSize: 40, distortion: 0, bitcrush: 16,
+                lowpass: 12000, highpass: 100, chorus: 0, delay: 25
+            },
+            forest: {
+                playbackRate: 0.98, pitchShift: 0, detune: 0,
+                reverb: 45, roomSize: 70, distortion: 0, bitcrush: 16,
+                lowpass: 8000, highpass: 0, chorus: 15, delay: 35
+            },
+            windtunnel: {
+                playbackRate: 0.85, pitchShift: -2, detune: 0,
+                reverb: 30, roomSize: 80, distortion: 10, bitcrush: 16,
+                lowpass: 1500, highpass: 0, chorus: 40, delay: 50
+            },
+            // Communication Presets
+            cbradio: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 0, roomSize: 10, distortion: 30, bitcrush: 8,
+                lowpass: 3000, highpass: 400, chorus: 0, delay: 0
+            },
+            megaphone: {
+                playbackRate: 1, pitchShift: 1, detune: 0,
+                reverb: 5, roomSize: 20, distortion: 45, bitcrush: 10,
+                lowpass: 4000, highpass: 500, chorus: 0, delay: 0
+            },
+            intercom: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 0, roomSize: 15, distortion: 25, bitcrush: 8,
+                lowpass: 3500, highpass: 300, chorus: 0, delay: 0
+            },
+            drivethru: {
+                playbackRate: 1, pitchShift: 0, detune: 0,
+                reverb: 0, roomSize: 10, distortion: 40, bitcrush: 6,
+                lowpass: 2800, highpass: 400, chorus: 0, delay: 0
+            },
+            // Fun/Novelty Presets
+            helicopter: {
+                playbackRate: 1, pitchShift: 0, detune: 10,
+                reverb: 20, roomSize: 50, distortion: 15, bitcrush: 12,
+                lowpass: 5000, highpass: 200, chorus: 60, delay: 15
+            },
+            brokenspeaker: {
+                playbackRate: 0.95, pitchShift: 0, detune: 0,
+                reverb: 5, roomSize: 20, distortion: 80, bitcrush: 4,
+                lowpass: 6000, highpass: 300, chorus: 0, delay: 10
+            },
+            gramophone: {
+                playbackRate: 0.92, pitchShift: -0.5, detune: -8,
+                reverb: 20, roomSize: 35, distortion: 35, bitcrush: 8,
+                lowpass: 4000, highpass: 200, chorus: 5, delay: 5
+            }
+        };
+
+        // Initialize audio context
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        // File upload handler
+        document.getElementById('audioFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                initAudioContext();
+                loadAudioFile(file);
+            }
+        });
+
+        // Load and decode audio file
+        function loadAudioFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                audioContext.decodeAudioData(e.target.result)
+                    .then(buffer => {
+                        audioBuffer = buffer;
+                        displayAudioInfo(file, buffer);
+                        drawWaveform(buffer);
+                        enableControls();
+                    })
+                    .catch(err => {
+                        alert('Error loading audio file: ' + err.message);
+                    });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Display audio file information
+        function displayAudioInfo(file, buffer) {
+            const info = document.getElementById('audioInfo');
+            const fileName = document.getElementById('fileName');
+            const fileDuration = document.getElementById('fileDuration');
+            
+            fileName.textContent = `File: ${file.name}`;
+            fileDuration.textContent = `Duration: ${Math.floor(buffer.duration / 60)}:${Math.floor(buffer.duration % 60).toString().padStart(2, '0')}`;
+            info.style.display = 'block';
+        }
+
+        // Simple waveform visualization
+        function drawWaveform(buffer) {
+            const canvas = document.getElementById('waveform');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            const data = buffer.getChannelData(0);
+            const step = Math.ceil(data.length / canvas.width);
+            const amp = canvas.height / 2;
+            
+            ctx.fillStyle = 'rgba(78, 205, 196, 0.8)';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < canvas.width; i++) {
+                let min = 1.0;
+                let max = -1.0;
+                for (let j = 0; j < step; j++) {
+                    const datum = data[(i * step) + j];
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
+                }
+                ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+            }
+        }
+
+        // Enable controls
+        function enableControls() {
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = false;
+        }
+
+        // Simple stop function
+        function stop() {
+            if (currentSource) {
+                try {
+                    currentSource.stop();
+                } catch (e) {}
+                currentSource = null;
+            }
+            isPlaying = false;
+            updateUI();
+        }
+
+        // Update UI
+        function updateUI() {
+            document.getElementById('playBtn').textContent = isPlaying ? '⏸️ Playing' : '▶️ Play';
+        }
+
+        // Play button
+        document.getElementById('playBtn').addEventListener('click', function() {
+            if (isPlaying) {
+                stop();
+            } else if (audioBuffer) {
+                play();
+            }
+        });
+
+        // Stop button
+        document.getElementById('stopBtn').addEventListener('click', stop);
+
+        // Play function
+        function play() {
+            if (!audioBuffer) return;
+            
+            stop(); // Always stop first
+            initAudioContext();
+
+            // Create source and gain
+            currentSource = audioContext.createBufferSource();
+            currentSource.buffer = audioBuffer;
+            currentGain = audioContext.createGain();
+            
+            // Apply current settings
+            const volume = document.getElementById('volume').value / 100;
+            const rate = document.getElementById('playbackRate').value;
+            
+            currentGain.gain.value = volume;
+            currentSource.playbackRate.value = rate;
+            
+            // Connect and start
+            currentSource.connect(currentGain);
+            currentGain.connect(audioContext.destination);
+            currentSource.start();
+            
+            isPlaying = true;
+            updateUI();
+            
+            currentSource.onended = () => {
+                isPlaying = false;
+                updateUI();
+            };
+        }
+
+        // Apply preset
+        function applyPreset(presetName) {
+            const preset = presets[presetName];
+            if (!preset) return;
+            
+            const wasPlaying = isPlaying;
+            if (wasPlaying) stop();
+            
+            // Update sliders
+            Object.keys(preset).forEach(key => {
+                const element = document.getElementById(key);
+                if (element) {
+                    element.value = preset[key];
+                    updateSliderDisplay(key, preset[key]);
+                }
+            });
+            
+            // Update active button
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Restart if was playing
+            if (wasPlaying) {
+                setTimeout(play, 50);
+            }
+        }
+
+        // Update slider displays
+        function updateSliderDisplay(id, value) {
+            const displays = {
+                volume: (val) => `${val}%`,
+                playbackRate: (val) => `${val}x`,
+                pitchShift: (val) => val,
+                detune: (val) => `${val}¢`,
+                reverb: (val) => `${val}%`,
+                roomSize: (val) => `${val}%`,
+                distortion: (val) => `${val}%`,
+                bitcrush: (val) => `${val}-bit`,
+                lowpass: (val) => `${val} Hz`,
+                highpass: (val) => `${val} Hz`,
+                chorus: (val) => `${val}%`,
+                delay: (val) => `${val}%`
+            };
+            
+            const displayElement = document.getElementById(id + 'Value');
+            if (displayElement && displays[id]) {
+                displayElement.textContent = displays[id](value);
+            }
+        }
+
+        // Slider event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            const sliders = ['volume', 'playbackRate', 'pitchShift', 'detune', 'reverb', 'roomSize', 'distortion', 'bitcrush', 'lowpass', 'highpass', 'chorus', 'delay'];
+            
+            sliders.forEach(id => {
+                const slider = document.getElementById(id);
+                if (slider) {
+                    slider.addEventListener('input', function() {
+                        updateSliderDisplay(id, this.value);
+                        
+                        // Real-time volume update
+                        if (id === 'volume' && currentGain) {
+                            currentGain.gain.value = this.value / 100;
+                        }
+                    });
+                    
+                    updateSliderDisplay(id, slider.value);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
