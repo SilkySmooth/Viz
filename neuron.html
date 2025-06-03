@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3D Music Visualizer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #audio, #volume, #style, #neuron, #brightness, #speed, #rotation, #sensitivity, #color, #zoom, label { 
+      position: absolute; 
+      left: 10px; 
+      z-index: 10; 
+      transition: opacity 0.3s ease;
+    }
+    #audio { top: 10px; }
+    #volume { top: 60px; width: 200px; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 5px; background: linear-gradient(to right, #1a3c9f, #ff1a7f); outline: none; }
+    #style { top: 90px; width: 200px; padding: 5px; border: none; border-radius: 5px; background: linear-gradient(to right, #1a3c9f, #ff1a7f); color: #ffffff; font-family: Arial, sans-serif; font-size: 14px; cursor: pointer; outline: none; }
+    #neuron { top: 120px; }
+    #brightness { top: 170px; width: 200px; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 5px; background: linear-gradient(to right, #1a3c9f, #ff1a7f); outline: none; }
+    #speed { top: 220px; width: 200px; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 5px; background: linear-gradient(to right, #1a3c9f, #ff1a7f); outline: none; }
+    #rotation { top: 270px; width: 200px; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 5px; background: linear-gradient(to right, #1a3c9f, #ff1a7f); outline: none; }
+    #sensitivity { top: 320px; width: 200px; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 5px; background: linear-gradient(to right, #1a3c9f, #ff1a7f); outline: none; }
+    #color { top: 370px; width: 200px; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 5px; background: linear-gradient(to right, #1a3c9f, #ff1a7f); outline: none; }
+    #zoom { top: 420px; width: 200px; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 5px; background: linear-gradient(to right, #1a3c9f, #ff1a7f); outline: none; }
+    #volume::-webkit-slider-thumb, #brightness::-webkit-slider-thumb, #speed::-webkit-slider-thumb, #rotation::-webkit-slider-thumb, #sensitivity::-webkit-slider-thumb, #color::-webkit-slider-thumb, #zoom::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #ffffff; cursor: pointer; box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    }
+    #volume::-moz-range-thumb, #brightness::-moz-range-thumb, #speed::-moz-range-thumb, #rotation::-moz-range-thumb, #sensitivity::-moz-range-thumb, #color::-moz-range-thumb, #zoom::-moz-range-thumb {
+      width: 16px; height: 16px; border-radius: 50%; background: #ffffff; cursor: pointer; box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    }
+    #style option { background: #1a3c9f; color: #ffffff; }
+    label { color: #ffffff; font-family: Arial, sans-serif; font-size: 12px; background: rgba(0, 0, 0, 0.5); padding: 2px 6px; border-radius: 3px; }
+    #volume-label { top: 40px; }
+    #brightness-label { top: 150px; }
+    #speed-label { top: 200px; }
+    #rotation-label { top: 250px; }
+    #sensitivity-label { top: 300px; }
+    #color-label { top: 350px; }
+    #zoom-label { top: 400px; }
+    .hidden { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <input type="file" id="audio" accept="audio/*">
+  <label id="volume-label" for="volume">Volume</label>
+  <input type="range" id="volume" min="0" max="1" step="0.01" value="1">
+  <select id="style">
+    <option value="sphere">Sphere</option>
+    <option value="cylinder">Cylinder</option>
+    <option value="viewport">Viewport</option>
+    <option value="tornado">Tornado</option>
+  </select>
+  <label><input type="checkbox" id="neuron"> Neuron Activation</label>
+  <label id="brightness-label" for="brightness">Brightness</label>
+  <input type="range" id="brightness" min="0.5" max="2" step="0.01" value="1">
+  <label id="speed-label" for="speed">Speed</label>
+  <input type="range" id="speed" min="0.1" max="2" step="0.01" value="1">
+  <label id="rotation-label" for="rotation">Rotation Speed</label>
+  <input type="range" id="rotation" min="0" max="0.05" step="0.001" value="0.01">
+  <label id="sensitivity-label" for="sensitivity">Neuron Sensitivity</label>
+  <input type="range" id="sensitivity" min="0.1" max="0.9" step="0.01" value="0.5">
+  <label id="color-label" for="color">Color</label>
+  <input type="range" id="color" min="0" max="1" step="0.01" value="0">
+  <label id="zoom-label" for="zoom">Zoom</label>
+  <input type="range" id="zoom" min="5" max="30" step="0.1" value="15">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script>
+    // Scene setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    let zoomDistance = 15;
+    camera.position.z = zoomDistance;
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Particle system setup
+    const particleCount = 10000;
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    // Tornado setup
+    const twisters = [];
+    function spawnTwister() {
+      return {
+        x: Math.random() * 16 - 8,
+        z: Math.random() * 16 - 8,
+        vx: (Math.random() - 0.5) * 0.08,
+        vz: (Math.random() - 0.5) * 0.08,
+        angle: 0,
+        spawnTime: Date.now(),
+        lifetime: 2000 + Math.random() * 3000
+      };
+    }
+
+    function updateParticlePositions(style, bass = 0) {
+      const fov = camera.fov * Math.PI / 180;
+      const height = 2 * Math.tan(fov / 2) * zoomDistance;
+      const aspect = window.innerWidth / window.innerHeight;
+      const width = height * aspect;
+      for (let i = 0; i < particleCount; i++) {
+        if (style === 'sphere') {
+          const theta = Math.random() * 2 * Math.PI;
+          const phi = Math.acos(2 * Math.random() - 1);
+          const r = 5 * Math.cbrt(Math.random());
+          positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+          positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+          positions[i * 3 + 2] = r * Math.cos(phi);
+        } else if (style === 'cylinder') {
+          const theta = Math.random() * 2 * Math.PI;
+          const r = 3 * Math.sqrt(Math.random());
+          const h = (Math.random() - 0.5) * 20;
+          positions[i * 3] = r * Math.cos(theta);
+          positions[i * 3 + 1] = h;
+          positions[i * 3 + 2] = r * Math.sin(theta);
+        } else if (style === 'viewport') {
+          const x = (Math.random() - 0.5) * width;
+          const y = (Math.random() - 0.5) * height;
+          const z = (Math.random() - 0.5) * 5;
+          positions[i * 3] = x;
+          positions[i * 3 + 1] = y;
+          positions[i * 3 + 2] = z;
+        } else if (style === 'tornado') {
+          let minDist = Infinity;
+          let nearestTwister = null;
+          for (let twister of twisters) {
+            const dx = twister.x - positions[i * 3];
+            const dz = twister.z - positions[i * 3 + 2];
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist < minDist) {
+              minDist = dist;
+              nearestTwister = twister;
+            }
+          }
+          if (nearestTwister && minDist < 3) {
+            const t = Math.random();
+            const h = t * 8 - 4;
+            const r = (1 - t) * 1.5 + 0.2;
+            const theta = t * 12 + nearestTwister.angle + Math.random() * 0.3;
+            const targetX = nearestTwister.x + r * Math.cos(theta);
+            const targetY = h;
+            const targetZ = nearestTwister.z + r * Math.sin(theta);
+            positions[i * 3] += (targetX - positions[i * 3]) * 0.1;
+            positions[i * 3 + 1] += (targetY - positions[i * 3 + 1]) * 0.1;
+            positions[i * 3 + 2] += (targetZ - positions[i * 3 + 2]) * 0.1;
+          } else {
+            const x = (Math.random() - 0.5) * 10;
+            const y = (Math.random() - 0.5) * 10;
+            const z = (Math.random() - 0.5) * 10;
+            positions[i * 3] += (x - positions[i * 3]) * 0.05;
+            positions[i * 3 + 1] += (y - positions[i * 3 + 1]) * 0.05;
+            positions[i * 3 + 2] += (z - positions[i * 3 + 2]) * 0.05;
+          }
+        }
+        colors[i * 3] = 1.0;
+        colors[i * 3 + 1] = 1.0;
+        colors[i * 3 + 2] = 1.0;
+      }
+      geometry.attributes.position.needsUpdate = true;
+      geometry.attributes.color.needsUpdate = true;
+    }
+
+    // Initialize with sphere
+    updateParticlePositions('sphere');
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uBass: { value: 0 },
+        uMids: { value: 0 },
+        uTreble: { value: 0 },
+        uBrightness: { value: 1 },
+        uSpeed: { value: 1 },
+        uHue: { value: 0 },
+      },
+      vertexShader: `
+        precision highp float;
+        attribute vec3 color;
+        varying vec3 vColor;
+        varying vec3 vPosition;
+        uniform float uTime;
+        uniform float uBass;
+        uniform float uTreble;
+        uniform float uSpeed;
+
+        float hash(vec3 p) {
+          p = fract(p * vec3(0.3183099, 0.3678794, 0.1414214));
+          return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+        }
+
+        float noise(vec3 p) {
+          vec3 i = floor(p);
+          vec3 f = fract(p);
+          vec3 u = f * f * (3.0 - 2.0 * f);
+          return mix(
+            mix(
+              mix(hash(i + vec3(0.0, 0.0, 0.0)), hash(i + vec3(1.0, 0.0, 0.0)), u.x),
+              mix(hash(i + vec3(0.0, 1.0, 0.0)), hash(i + vec3(1.0, 1.0, 0.0)), u.x),
+              u.y
+            ),
+            mix(
+              mix(hash(i + vec3(0.0, 0.0, 1.0)), hash(i + vec3(1.0, 0.0, 1.0)), u.x),
+              mix(hash(i + vec3(0.0, 1.0, 1.0)), hash(i + vec3(1.0, 1.0, 1.0)), u.x),
+              u.y
+            ),
+            u.z
+          );
+        }
+
+        void main() {
+          vColor = color;
+          vPosition = position;
+          vec3 pos = position;
+          float n = noise(pos * 0.2 + uTime * 0.5 * uSpeed);
+          pos += normalize(pos) * uBass * n * 2.0;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          gl_PointSize = 2.0 + uTreble * 5.0;
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+        varying vec3 vColor;
+        varying vec3 vPosition;
+        uniform float uTime;
+        uniform float uMids;
+        uniform float uTreble;
+        uniform float uBrightness;
+        uniform float uSpeed;
+        uniform float uHue;
+
+        float noise(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        vec3 hsl2rgb(vec3 hsl) {
+          float h = hsl.x, s = hsl.y, l = hsl.z;
+          float c = (1.0 - abs(2.0 * l - 1.0)) * s;
+          float x = c * (1.0 - abs(mod(h * 6.0, 2.0) - 1.0));
+          float m = l - c / 2.0;
+          vec3 rgb;
+          if (h < 1.0/6.0) rgb = vec3(c, x, 0.0);
+          else if (h < 2.0/6.0) rgb = vec3(x, c, 0.0);
+          else if (h < 3.0/6.0) rgb = vec3(0.0, c, x);
+          else if (h < 4.0/6.0) rgb = vec3(0.0, x, c);
+          else if (h < 5.0/6.0) rgb = vec3(x, 0.0, c);
+          else rgb = vec3(c, 0.0, x);
+          return rgb + m;
+        }
+
+        void main() {
+          vec2 uv = gl_FragCoord.xy / vec2(800.0, 600.0);
+          float n = noise(vPosition.xy * 0.5 + uTime * 0.3 * uSpeed);
+          vec3 color1 = hsl2rgb(vec3(mod(uHue, 1.0), 0.8, 0.5));
+          vec3 color2 = hsl2rgb(vec3(mod(uHue + 0.1, 1.0), 0.8, 0.5));
+          vec3 color3 = hsl2rgb(vec3(mod(uHue + 0.2, 1.0), 0.8, 0.5));
+          vec3 color = mix(color1, color2, n + uMids);
+          color = mix(color, color3, uMids * 0.5);
+          float glow = (0.7 + uTreble * 0.3) * uBrightness;
+          color *= glow;
+          float alpha = 1.0 - length(gl_PointCoord - vec2(0.5)) * 2.0;
+          gl_FragColor = vec4(color, alpha * 0.8);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+    });
+
+    const particles = new THREE.Points(geometry, material);
+    scene.add(particles);
+
+    // Lightning setup
+    const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 1.0 });
+    const glowLineMaterial = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+    const lines = [];
+    function createLightning(p1, p2) {
+      const segments = 8;
+      const points = [];
+      for (let t = 0; t <= 1; t += 1 / segments) {
+        const x = p1[0] + t * (p2[0] - p1[0]);
+        const y = p1[1] + t * (p2[1] - p1[1]);
+        const z = p1[2] + t * (p2[2] - p1[2]);
+        const offset = (Math.random() - 0.5) * 0.1;
+        points.push(new THREE.Vector3(
+          Math.max(-10, Math.min(10, x + offset)),
+          Math.max(-10, Math.min(10, y + offset)),
+          Math.max(-10, Math.min(10, z + offset))
+        ));
+      }
+      const path = new THREE.CatmullRomCurve3(points);
+      const lineGeometry = new THREE.TubeGeometry(path, 8, 0.02, 8, false);
+      const line = new THREE.Mesh(lineGeometry, lineMaterial);
+      line.userData = { startTime: Date.now(), duration: 400, progress: 0 };
+      scene.add(line);
+      
+      const glowLineGeometry = new THREE.TubeGeometry(path, 8, 0.05, 8, false);
+      const glowLine = new THREE.Mesh(glowLineGeometry, glowLineMaterial);
+      glowLine.userData = { startTime: Date.now(), duration: 400, progress: 0 };
+      scene.add(glowLine);
+      
+      lines.push(line, glowLine);
+      addGlowParticle(p1[0], p1[1], p1[2]);
+      addGlowParticle(p2[0], p2[1], p2[2]);
+      console.log("Lightning fired:", lines.length / 2, "Line from:", p1, "to:", p2);
+    }
+
+    // Glow particle system for lightning
+    const glowGeometry = new THREE.BufferGeometry();
+    const glowPositions = new Float32Array(100 * 3);
+    const glowOpacities = new Float32Array(100);
+    glowGeometry.setAttribute('position', new THREE.BufferAttribute(glowPositions, 3));
+    glowGeometry.setAttribute('opacity', new THREE.BufferAttribute(glowOpacities, 1));
+    const glowMaterial = new THREE.ShaderMaterial({
+      uniforms: { uBrightness: { value: 1 } },
+      vertexShader: `
+        attribute float opacity;
+        varying float vOpacity;
+        void main() {
+          vOpacity = opacity;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = 3.0;
+        }
+      `,
+      fragmentShader: `
+        varying float vOpacity;
+        uniform float uBrightness;
+        void main() {
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          gl_FragColor = vec4(0.5, 0.8, 1.0, vOpacity * 0.5 * uBrightness);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+    });
+    const glowParticles = new THREE.Points(glowGeometry, glowMaterial);
+    scene.add(glowParticles);
+    let glowCount = 0;
+
+    function addGlowParticle(x, y, z) {
+      if (glowCount < 100) {
+        glowPositions[glowCount * 3] = x;
+        glowPositions[glowCount * 3 + 1] = y;
+        glowPositions[glowCount * 3 + 2] = z;
+        glowOpacities[glowCount] = 1.0;
+        glowCount++;
+      } else {
+        for (let i = 0; i < 99; i++) {
+          glowPositions[i * 3] = glowPositions[(i + 1) * 3];
+          glowPositions[i * 3 + 1] = glowPositions[(i + 1) * 3 + 1];
+          glowPositions[i * 3 + 2] = glowPositions[(i + 1) * 3 + 2];
+          glowOpacities[i] = glowOpacities[i + 1];
+        }
+        glowPositions[99 * 3] = x;
+        glowPositions[99 * 3 + 1] = y;
+        glowPositions[99 * 3 + 2] = z;
+        glowOpacities[99] = 1.0;
+      }
+      glowGeometry.attributes.position.needsUpdate = true;
+      glowGeometry.attributes.opacity.needsUpdate = true;
+    }
+
+    // Audio setup
+    const audioElement = document.getElementById('audio');
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let source = null, analyser = null, gainNode = null;
+    audioElement.addEventListener('change', async () => {
+      const file = audioElement.files[0];
+      const arrayBuffer = await file.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      gainNode = audioContext.createGain();
+      source.connect(gainNode);
+      gainNode.connect(analyser);
+      analyser.connect(audioContext.destination);
+      source.start();
+    });
+
+    // Controls
+    const volumeSlider = document.getElementById('volume');
+    volumeSlider.addEventListener('input', () => {
+      if (gainNode) gainNode.gain.value = parseFloat(volumeSlider.value);
+    });
+
+    const styleSelect = document.getElementById('style');
+    styleSelect.addEventListener('change', () => {
+      twisters.length = 0;
+      updateParticlePositions(styleSelect.value);
+    });
+
+    const neuronCheckbox = document.getElementById('neuron');
+    neuronCheckbox.addEventListener('change', () => {
+      // No test line logic needed
+    });
+
+    const brightnessSlider = document.getElementById('brightness');
+    brightnessSlider.addEventListener('input', () => {
+      material.uniforms.uBrightness.value = parseFloat(brightnessSlider.value);
+      glowMaterial.uniforms.uBrightness.value = parseFloat(brightnessSlider.value);
+    });
+
+    const speedSlider = document.getElementById('speed');
+    speedSlider.addEventListener('input', () => {
+      material.uniforms.uSpeed.value = parseFloat(speedSlider.value);
+    });
+
+    const rotationSlider = document.getElementById('rotation');
+    rotationSlider.addEventListener('input', () => {
+      // No need to update material uniform; use directly in animation loop
+    });
+
+    const sensitivitySlider = document.getElementById('sensitivity');
+    const colorSlider = document.getElementById('color');
+    colorSlider.addEventListener('input', () => {
+      material.uniforms.uHue.value = parseFloat(colorSlider.value);
+    });
+
+    const zoomSlider = document.getElementById('zoom');
+    zoomSlider.addEventListener('input', () => {
+      zoomDistance = parseFloat(zoomSlider.value);
+      if (styleSelect.value === 'viewport' || styleSelect.value === 'cylinder') {
+        updateParticlePositions(styleSelect.value);
+      }
+      console.log("Zoom set to:", zoomDistance);
+    });
+
+    // Toggle controls visibility
+    let controlsVisible = true;
+    const toggleControls = () => {
+      controlsVisible = !controlsVisible;
+      audioElement.classList.toggle('hidden', !controlsVisible);
+      volumeSlider.classList.toggle('hidden', !controlsVisible);
+      styleSelect.classList.toggle('hidden', !controlsVisible);
+      neuronCheckbox.parentElement.classList.toggle('hidden', !controlsVisible);
+      brightnessSlider.classList.toggle('hidden', !controlsVisible);
+      speedSlider.classList.toggle('hidden', !controlsVisible);
+      rotationSlider.classList.toggle('hidden', !controlsVisible);
+      sensitivitySlider.classList.toggle('hidden', !controlsVisible);
+      colorSlider.classList.toggle('hidden', !controlsVisible);
+      zoomSlider.classList.toggle('hidden', !controlsVisible);
+      document.getElementById('volume-label').classList.toggle('hidden', !controlsVisible);
+      document.getElementById('brightness-label').classList.toggle('hidden', !controlsVisible);
+      document.getElementById('speed-label').classList.toggle('hidden', !controlsVisible);
+      document.getElementById('rotation-label').classList.toggle('hidden', !controlsVisible);
+      document.getElementById('sensitivity-label').classList.toggle('hidden', !controlsVisible);
+      document.getElementById('color-label').classList.toggle('hidden', !controlsVisible);
+      document.getElementById('zoom-label').classList.toggle('hidden', !controlsVisible);
+    };
+    renderer.domElement.addEventListener('click', (event) => {
+      if (event.target === audioElement || event.target === volumeSlider || event.target === styleSelect || 
+          event.target === neuronCheckbox || event.target === brightnessSlider || event.target === speedSlider || 
+          event.target === rotationSlider || event.target === sensitivitySlider || event.target === colorSlider || 
+          event.target === zoomSlider) return;
+      toggleControls();
+    });
+    renderer.domElement.addEventListener('touchstart', (event) => {
+      if (event.target === audioElement || event.target === volumeSlider || event.target === styleSelect || 
+          event.target === neuronCheckbox || event.target === brightnessSlider || event.target === speedSlider || 
+          event.target === rotationSlider || event.target === sensitivitySlider || event.target === colorSlider || 
+          event.target === zoomSlider) return;
+      toggleControls();
+    });
+
+    // Animation loop
+    const frequencyData = new Uint8Array(128);
+    let cameraAngle = 0;
+    function animate(time) {
+      time *= 0.001;
+      material.uniforms.uTime.value = time * material.uniforms.uSpeed.value;
+
+      if (analyser) {
+        analyser.getByteFrequencyData(frequencyData);
+        const bass = frequencyData.slice(0, 10).reduce((a, b) => a + b, 0) / (10 * 255);
+        const mids = frequencyData.slice(11, 50).reduce((a, b) => a + b, 0) / (40 * 255);
+        const treble = frequencyData.slice(51).reduce((a, b) => a + b, 0) / (77 * 255);
+        material.uniforms.uBass.value = bass;
+        material.uniforms.uMids.value = mids;
+        material.uniforms.uTreble.value = treble;
+
+        // Tornado management
+        if (styleSelect.value === 'tornado') {
+          const targetCount = Math.floor(bass * 6) + 1;
+          while (twisters.length < targetCount && twisters.length < 6) {
+            twisters.push(spawnTwister());
+          }
+          for (let i = twisters.length - 1; i >= 0; i--) {
+            const twister = twisters[i];
+            twister.x += twister.vx;
+            twister.z += twister.vz;
+            twister.angle += 0.3 * (0.5 + bass) * material.uniforms.uSpeed.value;
+            if (Date.now() - twister.spawnTime > twister.lifetime || twister.x < -8 || twister.x > 8 || twister.z < -8 || twister.z > 8) {
+              twisters.splice(i, 1);
+            }
+          }
+          updateParticlePositions('tornado', bass);
+        }
+
+        // Neuron activation
+        if (neuronCheckbox.checked && bass > parseFloat(sensitivitySlider.value) * 0.6) {
+          const maxLines = 50;
+          let lineCount = 0;
+          const indices = Array.from({length: particleCount}, (_, i) => i).sort(() => Math.random() - 0.5);
+          for (let k = 0; k < particleCount && lineCount < maxLines; k += 10) {
+            const i = indices[k];
+            const p1 = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
+            for (let m = k + 1; m < particleCount && lineCount < maxLines; m += 10) {
+              const j = indices[m];
+              const p2 = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
+              const dx = p1[0] - p2[0], dy = p1[1] - p2[1], dz = p1[2] - p2[2];
+              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+              if (dist < 4 && Math.random() < 0.4) {
+                createLightning(p1, p2);
+                lineCount++;
+              }
+            }
+          }
+        }
+      } else {
+        material.uniforms.uBass.value = 0;
+        material.uniforms.uMids.value = 0;
+        material.uniforms.uTreble.value = 0;
+      }
+
+      // Update lines
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i];
+        const elapsed = Date.now() - line.userData.startTime;
+        line.userData.progress = Math.min(elapsed / line.userData.duration, 1);
+        const t = line.userData.progress;
+        const opacity = t < 0.4 ? (t / 0.4) * 0.8 : (0.8 - (t - 0.4) / 0.6 * 0.8);
+        if (t >= 1) {
+          scene.remove(line);
+          line.geometry.dispose();
+          lines.splice(i, 1);
+        } else {
+          line.material.opacity = opacity;
+        }
+      }
+
+      // Update glow particles
+      for (let i = 0; i < glowCount; i++) {
+        glowOpacities[i] -= 0.033; // 300ms fade
+        if (glowOpacities[i] <= 0) {
+          for (let j = i; j < glowCount - 1; j++) {
+            glowPositions[j * 3] = glowPositions[(j + 1) * 3];
+            glowPositions[j * 3 + 1] = glowPositions[(j + 1) * 3 + 1];
+            glowPositions[j * 3 + 2] = glowPositions[(j + 1) * 3 + 2];
+            glowOpacities[j] = glowOpacities[j + 1];
+          }
+          glowCount--;
+          i--;
+        }
+      }
+      glowGeometry.attributes.position.needsUpdate = true;
+      glowGeometry.attributes.opacity.needsUpdate = true;
+
+      // Camera positioning
+      if (styleSelect.value !== 'viewport') {
+        cameraAngle += parseFloat(rotationSlider.value);
+        camera.position.x = zoomDistance * Math.sin(cameraAngle);
+        camera.position.z = zoomDistance * Math.cos(cameraAngle);
+        camera.position.y = 0;
+        camera.lookAt(0, 0, 0);
+      } else {
+        camera.position.set(0, 0, zoomDistance);
+        camera.lookAt(0, 0, 0);
+      }
+      console.log("Camera at:", camera.position.x, camera.position.y, camera.position.z);
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      if (styleSelect.value === 'viewport' || styleSelect.value === 'cylinder') {
+        updateParticlePositions(styleSelect.value);
+      }
+    });
+  </script>
+</body>
+</html>
