@@ -92,10 +92,6 @@
             background: #007AFF;
             color: white;
         }
-        .record-btn {
-            background: #FF3B30;
-            color: white;
-        }
         .stop-btn {
             background: #666;
             color: white;
@@ -383,7 +379,6 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
             
             <div class="button-group">
                 <button class="play-btn" onclick="playConversation()" aria-label="Play conversation">▶ Play</button>
-                <button class="record-btn" onclick="playAndRecord()" aria-label="Play and record conversation">⏺ Play & Record</button>
                 <button class="stop-btn" onclick="stopPlayback()" disabled aria-label="Stop playback">⏹ Stop</button>
             </div>
             
@@ -573,76 +568,6 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
             }
         }
 
-        async function startRecording() {
-            try {
-                const container = document.querySelector('.container');
-                if (!container) {
-                    throw new Error('Phone container not found.');
-                }
-
-                captureCanvas = document.createElement('canvas');
-                captureCanvas.width = container.offsetWidth;
-                captureCanvas.height = container.offsetHeight;
-                captureContext = captureCanvas.getContext('2d');
-
-                async function drawFrame() {
-                    if (!captureContext || !container) return;
-                    try {
-                        const canvas = await html2canvas(container, {
-                            width: container.offsetWidth,
-                            height: container.offsetHeight,
-                            scale: 1,
-                            backgroundColor: null
-                        });
-                        captureContext.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
-                        captureContext.drawImage(canvas, 0, 0);
-                    } catch (err) {
-                        console.error('Error capturing frame:', err);
-                    }
-                    if (mediaRecorder && mediaRecorder.state === 'recording') {
-                        requestAnimationFrame(drawFrame);
-                    }
-                }
-
-                drawFrame();
-
-                stream = captureCanvas.captureStream(30);
-
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'video/webm;codecs=vp8'
-                });
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
-                    }
-                };
-                mediaRecorder.onstop = () => {
-                    if (recordedChunks.length > 0) {
-                        const blob = new Blob(recordChunks, { type: 'video/webm' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'conversation_recording.webm';
-                        a.click();
-                        URL.revokeObjectURL(url);
-                    }
-                    recordedChunks = [];
-                    if (stream) {
-                        stream.getTracks().forEach(track => track.stop());
-                        stream = null;
-                    }
-                    captureCanvas = null;
-                    captureContext = null;
-                };
-                mediaRecorder.start();
-                return true;
-            } catch (err) {
-                console.error('Error starting recording:', err.message);
-                alert(`Failed to start recording: ${err.message || 'An unexpected error occurred.'}`);
-                return false;
-            }
-        }
-
         function smoothScrollToBottom(container) {
             const scrollStep = container.scrollHeight / 20;
             let currentScroll = container.scrollTop;
@@ -651,7 +576,7 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                 currentScroll += scrollStep;
                 container.scrollTop = currentScroll;
                 
-                if (currentScroll < container.scrollHeight - container.clientHeight) {
+                if (currentScroll < container.scrollHeight - (container.clientHeight+2)) {
                     requestAnimationFrame(step);
                 }
             }
@@ -659,7 +584,7 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
             requestAnimationFrame(step);
         }
 
-        async function playConversation(isRecording = false) {
+        async function playConversation() {
             if (isPlaying) return;
             
             updateContactInfo();
@@ -688,16 +613,10 @@ How about 7pm at the theater? ⭐`;
             const scalingFactor = naturalDuration > 0 ? desiredRunTime / naturalDuration : 1;
             totalDuration = desiredRunTime;
             
-            if (isRecording) {
-                const recordingStarted = await startRecording();
-                if (!recordingStarted) return;
-            }
-            
             isPlaying = true;
             startTime = Date.now();
             
             document.querySelector('.play-btn').disabled = true;
-            document.querySelector('.record-btn').disabled = true;
             document.querySelector('.stop-btn').disabled = false;
             
             timerInterval = setInterval(() => {
@@ -831,10 +750,6 @@ How about 7pm at the theater? ⭐`;
             }
         }
 
-        function playAndRecord() {
-            playConversation(true);
-        }
-
         function stopPlayback() {
             isPlaying = false;
             timeouts.forEach(timeout => clearTimeout(timeout));
@@ -842,11 +757,7 @@ How about 7pm at the theater? ⭐`;
             if (timerInterval) {
                 clearInterval(timerInterval);
             }
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-            }
             document.querySelector('.play-btn').disabled = false;
-            document.querySelector('.record-btn').disabled = false;
             document.querySelector('.stop-btn').disabled = true;
             const typingIndicator = document.getElementById('typingIndicator');
             typingIndicator.classList.remove('visible');
