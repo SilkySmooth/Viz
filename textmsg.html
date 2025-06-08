@@ -576,7 +576,7 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                 currentScroll += scrollStep;
                 container.scrollTop = currentScroll;
                 
-                if (currentScroll < container.scrollHeight - (container.clientHeight+2)) {
+                if (currentScroll < (container.scrollHeight+2) - container.clientHeight) {
                     requestAnimationFrame(step);
                 }
             }
