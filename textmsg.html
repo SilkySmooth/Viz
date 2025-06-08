@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Text Message Simulator</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -306,11 +305,11 @@
         .typing-indicator {
             align-self: flex-start;
             margin-bottom: 8px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            display: none;
+            transition: none;
         }
         .typing-indicator.visible {
-            opacity: 1;
+            display: block;
         }
         .typing-bubble {
             display: inline-block;
@@ -454,14 +453,9 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
     <script>
         let isPlaying = false;
         let timeouts = [];
-        let mediaRecorder;
-        let recordedChunks = [];
-        let stream;
         let startTime;
         let totalDuration = 0;
         let timerInterval;
-        let captureCanvas;
-        let captureContext;
 
         function updateContactInfo() {
             const name = document.getElementById('contactName').value || 'Contact';
@@ -576,7 +570,7 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                 currentScroll += scrollStep;
                 container.scrollTop = currentScroll;
                 
-                if (currentScroll < (container.scrollHeight+2) - container.clientHeight) {
+                if (currentScroll < container.scrollHeight - container.clientHeight) {
                     requestAnimationFrame(step);
                 }
             }
