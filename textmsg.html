@@ -61,7 +61,7 @@
             margin-bottom: 5px;
             color: #333;
         }
-        input[type="text"], input[type="url"], textarea {
+        input[type="text"], input[type="url"], textarea, input[type="number"] {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -376,6 +376,11 @@ What time should we meet?
 How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
             </div>
             
+            <div class="control-group">
+                <label for="runTime">Run Time (seconds):</label>
+                <input type="number" id="runTime" value="30" min="1" step="1" aria-label="Run time in seconds">
+            </div>
+            
             <div class="button-group">
                 <button class="play-btn" onclick="playConversation()" aria-label="Play conversation">▶ Play</button>
                 <button class="record-btn" onclick="playAndRecord()" aria-label="Play and record conversation">⏺ Play & Record</button>
@@ -534,20 +539,22 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
             return messages;
         }
 
-        function calculateTotalDuration(messages) {
-            let total = 0;
+        function calculateNaturalDuration(messages) {
+            let delay = 300;
             for (let msg of messages) {
                 if (msg.customDelay > 0) {
-                    total += msg.customDelay;
+                    delay += msg.customDelay;
                 } else {
-                    total += msg.typingTime;
+                    if (msg.sender === 'received') {
+                        delay += 500;
+                        delay += msg.typingTime;
+                    } else {
+                        delay += msg.typingTime;
+                    }
                 }
-                total += 100;
-                if (msg.sender === 'received') {
-                    total += msg.typingTime;
-                }
+                delay += 50;
             }
-            return total;
+            return delay + 500;
         }
 
         function formatTime(ms) {
@@ -568,19 +575,16 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
 
         async function startRecording() {
             try {
-                // Get the phone container element
                 const container = document.querySelector('.container');
                 if (!container) {
                     throw new Error('Phone container not found.');
                 }
 
-                // Create a canvas for recording
                 captureCanvas = document.createElement('canvas');
                 captureCanvas.width = container.offsetWidth;
                 captureCanvas.height = container.offsetHeight;
                 captureContext = captureCanvas.getContext('2d');
 
-                // Function to draw container to canvas using html2canvas
                 async function drawFrame() {
                     if (!captureContext || !container) return;
                     try {
@@ -600,11 +604,9 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                     }
                 }
 
-                // Start drawing
                 drawFrame();
 
-                // Get canvas stream
-                stream = captureCanvas.captureStream(30); // 30 FPS
+                stream = captureCanvas.captureStream(30);
 
                 mediaRecorder = new MediaRecorder(stream, {
                     mimeType: 'video/webm;codecs=vp8'
@@ -616,7 +618,7 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                 };
                 mediaRecorder.onstop = () => {
                     if (recordedChunks.length > 0) {
-                        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                        const blob = new Blob(recordChunks, { type: 'video/webm' });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
@@ -680,13 +682,18 @@ How about 7pm at the theater? ⭐`;
                 return;
             }
             
+            const naturalDuration = calculateNaturalDuration(messages);
+            const runTimeInput = document.getElementById('runTime').value;
+            const desiredRunTime = runTimeInput ? parseInt(runTimeInput) * 1000 : naturalDuration;
+            const scalingFactor = naturalDuration > 0 ? desiredRunTime / naturalDuration : 1;
+            totalDuration = desiredRunTime;
+            
             if (isRecording) {
                 const recordingStarted = await startRecording();
                 if (!recordingStarted) return;
             }
             
             isPlaying = true;
-            totalDuration = calculateTotalDuration(messages);
             startTime = Date.now();
             
             document.querySelector('.play-btn').disabled = true;
@@ -706,24 +713,23 @@ How about 7pm at the theater? ⭐`;
             const messagesContainer = document.getElementById('messages');
             const typingIndicator = document.getElementById('typingIndicator');
             
-            // Clear existing messages but preserve typing indicator
             messagesContainer.innerHTML = '';
             messagesContainer.appendChild(typingIndicator);
             
-            let delay = 300;
+            let delay = 300 * scalingFactor;
             
             messages.forEach((msg, i) => {
+                const typingTimeScaled = msg.typingTime * scalingFactor;
                 if (msg.customDelay > 0) {
-                    delay += msg.customDelay;
-                    
+                    const customDelayScaled = msg.customDelay * scalingFactor;
+                    delay += customDelayScaled;
                     if (msg.sender === 'received') {
                         const typingTimeout = setTimeout(() => {
                             if (!isPlaying) return;
                             typingIndicator.classList.add('visible');
                             smoothScrollToBottom(messagesContainer);
-                        }, delay - msg.typingTime);
+                        }, delay - typingTimeScaled);
                         timeouts.push(typingTimeout);
-                        
                         const hideTypingTimeout = setTimeout(() => {
                             if (!isPlaying) return;
                             typingIndicator.classList.remove('visible');
@@ -732,65 +738,53 @@ How about 7pm at the theater? ⭐`;
                     }
                 } else {
                     if (msg.sender === 'received') {
-                        delay += 500;
-                        
+                        delay += 500 * scalingFactor;
                         const typingTimeout = setTimeout(() => {
                             if (!isPlaying) return;
                             typingIndicator.classList.add('visible');
                             smoothScrollToBottom(messagesContainer);
                         }, delay);
                         timeouts.push(typingTimeout);
-                        
-                        delay += msg.typingTime;
-                        
+                        delay += typingTimeScaled;
                         const hideTypingTimeout = setTimeout(() => {
                             if (!isPlaying) return;
                             typingIndicator.classList.remove('visible');
                         }, delay);
                         timeouts.push(hideTypingTimeout);
                     } else {
-                        delay += msg.typingTime;
+                        delay += typingTimeScaled;
                     }
                 }
-                
                 const messageTimeout = setTimeout(() => {
                     if (!isPlaying) return;
-                    
                     const messageEl = document.createElement('div');
                     messageEl.className = `message ${msg.sender}`;
                     messageEl.innerHTML = `<div class="message-bubble">${msg.text}</div>`;
                     messagesContainer.insertBefore(messageEl, typingIndicator);
-                    
                     messageEl.offsetHeight;
                     messageEl.classList.add('visible');
-                    
                     updateMessageTails();
                     smoothScrollToBottom(messagesContainer);
                 }, delay);
                 timeouts.push(messageTimeout);
-                
-                delay += 50;
+                delay += 50 * scalingFactor;
             });
             
             const endTimeout = setTimeout(() => {
                 stopPlayback();
-            }, delay + 500);
+            }, delay + 500 * scalingFactor);
             timeouts.push(endTimeout);
         }
 
         function updateMessageTails() {
             const messages = document.querySelectorAll('.message.visible');
             
-            // Remove all existing tails and reset styles
             messages.forEach(msg => {
                 msg.classList.remove('show-tail');
                 const bubble = msg.querySelector('.message-bubble');
                 if (bubble) {
-                    // Remove any existing tail elements
                     const existingTails = bubble.querySelectorAll('div[style*="transform"]');
                     existingTails.forEach(tail => tail.remove());
-                    
-                    // Reset to default styles
                     if (msg.classList.contains('sent')) {
                         bubble.style.setProperty('background', '#007AFF', 'important');
                         bubble.style.setProperty('border-radius', '20px', 'important');
@@ -801,7 +795,6 @@ How about 7pm at the theater? ⭐`;
                 }
             });
             
-            // Add tails to the last message in each sender group
             for (let i = 0; i < messages.length; i++) {
                 const currentMessage = messages[i];
                 const nextMessage = messages[i + 1];
@@ -814,26 +807,21 @@ How about 7pm at the theater? ⭐`;
                 
                 if (isLastMessage || nextIsDifferentSender) {
                     currentMessage.classList.add('show-tail');
-                    
                     const bubble = currentMessage.querySelector('.message-bubble');
                     if (bubble) {
                         if (currentMessage.classList.contains('sent')) {
-                            // Blue sent message tail
                             bubble.style.setProperty('background', '#007AFF', 'important');
                             bubble.style.setProperty('color', 'white', 'important');
                             bubble.style.setProperty('border-radius', '20px', 'important');
                             bubble.style.border = 'none';
-                            
                             bubble.style.position = 'relative';
                             const tailHTML = `<div style="position: absolute; bottom: 0; right: -3px; width: 11px; height: 11px; background: #007AFF; border-radius: 0 0 11px 0; transform: rotate(45deg);"></div>`;
                             bubble.insertAdjacentHTML('beforeend', tailHTML);
                         } else {
-                            // Gray received message tail
                             bubble.style.setProperty('background', '#e9e9eb', 'important');
                             bubble.style.setProperty('color', 'black', 'important');
                             bubble.style.setProperty('border-radius', '20px', 'important');
                             bubble.style.border = 'none';
-                            
                             bubble.style.position = 'relative';
                             const tailHTML = `<div style="position: absolute; bottom: 0; left: -3px; width: 11px; height: 11px; background: #e9e9eb; border-radius: 0 0 0 11px; transform: rotate(-45deg);"></div>`;
                             bubble.insertAdjacentHTML('beforeend', tailHTML);
@@ -849,22 +837,17 @@ How about 7pm at the theater? ⭐`;
 
         function stopPlayback() {
             isPlaying = false;
-            
             timeouts.forEach(timeout => clearTimeout(timeout));
             timeouts = [];
-            
             if (timerInterval) {
                 clearInterval(timerInterval);
             }
-            
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
             }
-            
             document.querySelector('.play-btn').disabled = false;
             document.querySelector('.record-btn').disabled = false;
             document.querySelector('.stop-btn').disabled = true;
-            
             const typingIndicator = document.getElementById('typingIndicator');
             typingIndicator.classList.remove('visible');
             updateTimer(0);
