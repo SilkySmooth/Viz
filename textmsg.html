@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Message Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f0f0;
+            padding: 20px;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .main-container {
+            display: flex;
+            gap: 30px;
+            max-width: 700px;
+            margin: 0 auto;
+            align-items: flex-start;
+            overflow: hidden;
+        }
+        .controls {
+            background: #f8f8f8;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-width: 350px;
+            flex-shrink: 0;
+        }
+        .phone-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background: #fff;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 320px;
+            height: 640px;
+            flex-shrink: 0;
+            border: 8px solid #000;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        input[type="text"], input[type="url"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .play-btn {
+            background: #007AFF;
+            color: white;
+        }
+        .record-btn {
+            background: #FF3B30;
+            color: white;
+        }
+        .stop-btn {
+            background: #666;
+            color: white;
+        }
+        button:hover {
+            opacity: 0.8;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .timer {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007AFF;
+            text-align: center;
+            margin-top: 10px;
+        }
+        .status-bar {
+            background: rgba(0,0,0,0.03);
+            height: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .status-left {
+            display: flex;
+            align-items: center;
+        }
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .signal-bars {
+            display: flex;
+            gap: 2px;
+            align-items: flex-end;
+            margin-right: 4px;
+        }
+        .signal-bar {
+            width: 3px;
+            background: #000;
+            border-radius: 1px;
+        }
+        .signal-bar:nth-child(1) { height: 4px; }
+        .signal-bar:nth-child(2) { height: 6px; }
+        .signal-bar:nth-child(3) { height: 8px; }
+        .signal-bar:nth-child(4) { height: 10px; }
+        .wifi-icon {
+            width: 15px;
+            height: 11px;
+            margin-right: 4px;
+        }
+        .battery-icon {
+            width: 24px;
+            height: 12px;
+        }
+        .header {
+            background: #f8f8f8;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+        .back-btn {
+            color: #007AFF;
+            font-size: 40px;
+            font-weight: 100;
+            display: flex;
+            align-items: center;
+            line-height: 1;
+            margin-right: 5px;
+        }
+        .contact-info {
+            flex: 1;
+            text-align: center;
+        }
+        .contact-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #ddd;
+            margin: 0 auto 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .contact-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .contact-avatar .default-avatar {
+            color: white;
+            font-size: 18px;
+        }
+        .contact-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .video-call-btn {
+            color: #007AFF;
+            display: flex;
+            align-items: center;
+        }
+        .video-call-icon {
+            width: 28px;
+            height: 28px;
+        }
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #fff;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .message {
+            display: flex;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            max-width: 80%;
+        }
+        .message.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .message.sent {
+            align-self: flex-end;
+            justify-content: flex-end;
+        }
+        .message.received {
+            align-self: flex-start;
+            justify-content: flex-start;
+        }
+        .message-bubble {
+            display: inline-block;
+            max-width: 100%;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 16px;
+            line-height: 1.25;
+            overflow-wrap: break-word;
+            text-align: left;
+            position: relative;
+        }
+        .sent .message-bubble {
+            background: #007AFF;
+            color: white;
+        }
+        .received .message-bubble {
+            background: #e9e9eb;
+            color: black;
+        }
+        .input-area {
+            background: #f8f8f8;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+        .plus-btn {
+            color: #C7C7CC;
+            font-size: 18px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1.5px solid #C7C7CC;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .input-container {
+            flex: 1;
+            position: relative;
+            height: 36px;
+        }
+        .message-input {
+            width: 100%;
+            height: 100%;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 18px;
+            padding: 0 40px 0 15px;
+            font-size: 16px;
+            box-sizing: border-box;
+            outline: none;
+        }
+        .mic-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 20px;
+        }
+        .typing-indicator {
+            align-self: flex-start;
+            margin-bottom: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .typing-indicator.visible {
+            opacity: 1;
+        }
+        .typing-bubble {
+            display: inline-block;
+            background: #e9e9eb;
+            padding: 12px 16px;
+            border-radius: 18px;
+            border-bottom-left-radius: 6px;
+        }
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+        }
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="contactName">Contact Name:</label>
+                <input type="text" id="contactName" value="Melody" placeholder="Enter contact name" aria-label="Contact name">
+            </div>
+            
+            <div class="control-group">
+                <label for="avatarUrl">Avatar URL (optional):</label>
+                <input type="url" id="avatarUrl" placeholder="https://example.com/avatar.jpg" aria-label="Avatar URL">
+            </div>
+            
+            <div class="control-group">
+                <label for="conversation">Conversation (line by line):</label>
+                <textarea id="conversation" placeholder="Enter your conversation, one message per line:
+Hey! Are you free tonight? 🎬
+Hi! Yes I am, what's up?
+[D] Want to catch that new movie? 🍿
+[T=2000] That sounds amazing! 😊
+What time should we meet?
+How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
+            </div>
+            
+            <div class="button-group">
+                <button class="play-btn" onclick="playConversation()" aria-label="Play conversation">▶ Play</button>
+                <button class="record-btn" onclick="playAndRecord()" aria-label="Play and record conversation">⏺ Play & Record</button>
+                <button class="stop-btn" onclick="stopPlayback()" disabled aria-label="Stop playback">⏹ Stop</button>
+            </div>
+            
+            <div class="timer" id="timer" aria-live="polite">Ready to play</div>
+        </div>
+        <div class="phone-container">
+            <div class="container">
+                <div class="status-bar">
+                    <div class="status-left">
+                        <span>9:41</span>
+                    </div>
+                    <div class="status-right">
+                        <div class="signal-bars">
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                            <div class="signal-bar"></div>
+                        </div>
+                        <svg class="wifi-icon" viewBox="0 0 15 11" fill="none">
+                            <path d="M7.5 11L5.5 8.5C6.33333 7.83333 7.41667 7.5 8.75 7.5C10.0833 7.5 11.1667 7.83333 12 8.5L10 11H7.5Z" fill="currentColor"/>
+                            <path d="M7.5 11L3 5.5C4.66667 4.16667 6.83333 3.5 9.5 3.5C12.1667 3.5 14.3333 4.16667 16 5.5L14.5 7C13.1667 6 11.5 5.5 9.5 5.5C7.5 5.5 5.83333 6 4.5 7L7.5 11Z" fill="currentColor"/>
+                            <path d="M7.5 11L0.5 2.5C3 0.833333 6.16667 0 10 0C13.8333 0 17 0.833333 19.5 2.5L18 4C15.8333 2.66667 13.1667 2 10 2C6.83333 2 4.16667 2.66667 2 4L7.5 11Z" fill="currentColor"/>
+                        </svg>
+                        <svg class="battery-icon" viewBox="0 0 24 12" fill="none">
+                            <rect x="0" y="2" width="20" height="8" rx="2" stroke="currentColor" stroke-width="1"/>
+                            <rect x="1.5" y="3.5" width="17" height="5" rx="0.5" fill="currentColor"/>
+                            <rect x="21" y="4.5" width="2" height="3" rx="1" fill="currentColor"/>
+                        </svg>
+                    </div>
+                </div>
+                
+                <div class="header">
+                    <div class="back-btn" aria-label="Back">‹</div>
+                    <div class="contact-info">
+                        <div class="contact-avatar" id="contactAvatar" role="img" aria-label="Contact avatar">
+                            <span class="default-avatar">👤</span>
+                        </div>
+                        <div class="contact-name" id="contactNameDisplay">Melody</div>
+                    </div>
+                    <div class="video-call-btn" aria-label="Video call">
+                        <svg class="video-call-icon" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="14" height="14" rx="2" ry="2"/>
+                            <path d="M16 8.5l5-5v12l-5-5"/>
+                        </svg>
+                    </div>
+                </div>
+                
+                <div class="messages" id="messages" role="log" aria-live="polite">
+                    <div class="typing-indicator" id="typingIndicator">
+                        <div class="typing-bubble">
+                            <div class="typing-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="input-area">
+                    <div class="plus-btn" aria-label="More options">+</div>
+                    <div class="input-container">
+                        <input type="text" class="message-input" placeholder="iMessage" readonly aria-label="Message input">
+                        <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M12 19v2m-4-2v2m8-2v2M5 12h14"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let isPlaying = false;
+        let timeouts = [];
+        let mediaRecorder;
+        let recordedChunks = [];
+        let stream;
+        let startTime;
+        let totalDuration = 0;
+        let timerInterval;
+
+        function updateContactInfo() {
+            const name = document.getElementById('contactName').value || 'Contact';
+            const avatarUrl = document.getElementById('avatarUrl').value;
+            const nameDisplay = document.getElementById('contactNameDisplay');
+            const avatar = document.getElementById('contactAvatar');
+            
+            nameDisplay.textContent = name;
+            
+            if (avatarUrl) {
+                const img = new Image();
+                img.src = avatarUrl;
+                img.alt = `${name}'s avatar`;
+                img.onerror = () => {
+                    avatar.innerHTML = '<span class="default-avatar">👤</span>';
+                };
+                img.onload = () => {
+                    avatar.innerHTML = '';
+                    avatar.appendChild(img);
+                };
+            } else {
+                avatar.innerHTML = '<span class="default-avatar">👤</span>';
+            }
+        }
+
+        function calculateTypingTime(text) {
+            const charsPerSecond = 8;
+            const typingTime = (text.length / charsPerSecond) * 1000;
+            return Math.max(typingTime, 300);
+        }
+
+        function parseConversation(text) {
+            const lines = text.split('\n').filter(line => line.trim());
+            const messages = [];
+            let currentSender = 'sent';
+            
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+                
+                let delay = 0;
+                let sameAsPrevious = false;
+                
+                const timeMatch = line.match(/^\[T=(\d+)\]\s*(.*)$/);
+                if (timeMatch) {
+                    delay = parseInt(timeMatch[1]) || 0;
+                    line = timeMatch[2];
+                }
+                
+                if (line.startsWith('[D]')) {
+                    sameAsPrevious = true;
+                    line = line.substring(3).trim();
+                }
+                
+                if (!sameAsPrevious) {
+                    currentSender = currentSender === 'sent' ? 'received' : 'sent';
+                }
+                
+                if (line) {
+                    const typingTime = calculateTypingTime(line);
+                    messages.push({
+                        text: line,
+                        sender: currentSender,
+                        customDelay: delay,
+                        typingTime: typingTime
+                    });
+                }
+            }
+            
+            return messages;
+        }
+
+        function calculateTotalDuration(messages) {
+            let total = 0;
+            for (let msg of messages) {
+                if (msg.customDelay > 0) {
+                    total += msg.customDelay;
+                } else {
+                    total += msg.typingTime;
+                }
+                total += 100;
+                if (msg.sender === 'received') {
+                    total += msg.typingTime;
+                }
+            }
+            return total;
+        }
+
+        function formatTime(ms) {
+            const seconds = Math.ceil(ms / 1000);
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateTimer(remaining) {
+            const timer = document.getElementById('timer');
+            if (remaining > 0) {
+                timer.textContent = `Time remaining: ${formatTime(remaining)}`;
+            } else {
+                timer.textContent = 'Ready to play';
+            }
+        }
+
+        async function startRecording() {
+            try {
+                // Check if API is supported
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                    throw new Error('Screen recording is not supported in this browser.');
+                }
+
+                // Check if running on HTTPS or localhost
+                if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                    throw new Error('Screen recording requires a secure context (HTTPS or localhost).');
+                }
+
+                stream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: true,
+                    audio: true,
+                    preferCurrentTab: true
+                });
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'video/webm;codecs=vp8,opus'
+                });
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+                mediaRecorder.onstop = () => {
+                    if (recordedChunks.length > 0) {
+                        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'conversation_recording.webm';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                    recordedChunks = [];
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                        stream = null;
+                    }
+                };
+                mediaRecorder.start();
+                return true;
+            } catch (err) {
+                console.error('Error starting recording:', err.message);
+                let errorMessage = 'Failed to start recording. ';
+                if (err.name === 'NotAllowedError') {
+                    errorMessage += 'Please grant screen recording permissions and try again.';
+                } else if (err.name === 'NotFoundError') {
+                    errorMessage += 'No screen or audio source was found.';
+                } else {
+                    errorMessage += err.message || 'An unexpected error occurred.';
+                }
+                alert(errorMessage);
+                return false;
+            }
+        }
+
+        function smoothScrollToBottom(container) {
+            const scrollStep = container.scrollHeight / 20;
+            let currentScroll = container.scrollTop;
+            
+            function step() {
+                currentScroll += scrollStep;
+                container.scrollTop = currentScroll;
+                
+                if (currentScroll < container.scrollHeight - container.clientHeight) {
+                    requestAnimationFrame(step);
+                }
+            }
+            
+            requestAnimationFrame(step);
+        }
+
+        async function playConversation(isRecording = false) {
+            if (isPlaying) return;
+            
+            updateContactInfo();
+            let conversationText = document.getElementById('conversation').value;
+            
+            if (!conversationText.trim()) {
+                conversationText = `Hey! Are you free tonight? 🎬
+Hi! Yes I am, what's up?
+[D] Want to catch that new movie? 🍿
+[T=2000] That sounds amazing! 😊
+What time should we meet?
+How about 7pm at the theater? ⭐`;
+                document.getElementById('conversation').value = conversationText;
+            }
+            
+            const messages = parseConversation(conversationText);
+            
+            if (messages.length === 0) {
+                alert('No valid messages found');
+                return;
+            }
+            
+            if (isRecording) {
+                const recordingStarted = await startRecording();
+                if (!recordingStarted) return;
+            }
+            
+            isPlaying = true;
+            totalDuration = calculateTotalDuration(messages);
+            startTime = Date.now();
+            
+            document.querySelector('.play-btn').disabled = true;
+            document.querySelector('.record-btn').disabled = true;
+            document.querySelector('.stop-btn').disabled = false;
+            
+            timerInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const remaining = Math.max(0, totalDuration - elapsed);
+                updateTimer(remaining);
+                
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                }
+            }, 100);
+            
+            const messagesContainer = document.getElementById('messages');
+            const typingIndicator = document.getElementById('typingIndicator');
+            
+            // Clear existing messages but preserve typing indicator
+            messagesContainer.innerHTML = '';
+            messagesContainer.appendChild(typingIndicator);
+            
+            let delay = 300;
+            
+            messages.forEach((msg, i) => {
+                if (msg.customDelay > 0) {
+                    delay += msg.customDelay;
+                    
+                    if (msg.sender === 'received') {
+                        const typingTimeout = setTimeout(() => {
+                            if (!isPlaying) return;
+                            typingIndicator.classList.add('visible');
+                            smoothScrollToBottom(messagesContainer);
+                        }, delay - msg.typingTime);
+                        timeouts.push(typingTimeout);
+                        
+                        const hideTypingTimeout = setTimeout(() => {
+                            if (!isPlaying) return;
+                            typingIndicator.classList.remove('visible');
+                        }, delay);
+                        timeouts.push(hideTypingTimeout);
+                    }
+                } else {
+                    if (msg.sender === 'received') {
+                        delay += 500;
+                        
+                        const typingTimeout = setTimeout(() => {
+                            if (!isPlaying) return;
+                            typingIndicator.classList.add('visible');
+                            smoothScrollToBottom(messagesContainer);
+                        }, delay);
+                        timeouts.push(typingTimeout);
+                        
+                        delay += msg.typingTime;
+                        
+                        const hideTypingTimeout = setTimeout(() => {
+                            if (!isPlaying) return;
+                            typingIndicator.classList.remove('visible');
+                        }, delay);
+                        timeouts.push(hideTypingTimeout);
+                    } else {
+                        delay += msg.typingTime;
+                    }
+                }
+                
+                const messageTimeout = setTimeout(() => {
+                    if (!isPlaying) return;
+                    
+                    const messageEl = document.createElement('div');
+                    messageEl.className = `message ${msg.sender}`;
+                    messageEl.innerHTML = `<div class="message-bubble">${msg.text}</div>`;
+                    messagesContainer.insertBefore(messageEl, typingIndicator);
+                    
+                    messageEl.offsetHeight;
+                    messageEl.classList.add('visible');
+                    
+                    updateMessageTails();
+                    smoothScrollToBottom(messagesContainer);
+                }, delay);
+                timeouts.push(messageTimeout);
+                
+                delay += 50;
+            });
+            
+            const endTimeout = setTimeout(() => {
+                stopPlayback();
+            }, delay + 500);
+            timeouts.push(endTimeout);
+        }
+
+        function updateMessageTails() {
+            const messages = document.querySelectorAll('.message.visible');
+            
+            // Remove all existing tails and reset styles
+            messages.forEach(msg => {
+                msg.classList.remove('show-tail');
+                const bubble = msg.querySelector('.message-bubble');
+                if (bubble) {
+                    // Remove any existing tail elements
+                    const existingTails = bubble.querySelectorAll('div[style*="transform"]');
+                    existingTails.forEach(tail => tail.remove());
+                    
+                    // Reset to default styles
+                    if (msg.classList.contains('sent')) {
+                        bubble.style.setProperty('background', '#007AFF', 'important');
+                        bubble.style.setProperty('border-radius', '20px', 'important');
+                    } else {
+                        bubble.style.setProperty('background', '#e9e9eb', 'important');
+                        bubble.style.setProperty('border-radius', '20px', 'important');
+                    }
+                }
+            });
+            
+            // Add tails to the last message in each sender group
+            for (let i = 0; i < messages.length; i++) {
+                const currentMessage = messages[i];
+                const nextMessage = messages[i + 1];
+                
+                const isLastMessage = !nextMessage;
+                const nextIsDifferentSender = nextMessage && (
+                    (currentMessage.classList.contains('sent') && nextMessage.classList.contains('received')) ||
+                    (currentMessage.classList.contains('received') && nextMessage.classList.contains('sent'))
+                );
+                
+                if (isLastMessage || nextIsDifferentSender) {
+                    currentMessage.classList.add('show-tail');
+                    
+                    const bubble = currentMessage.querySelector('.message-bubble');
+                    if (bubble) {
+                        if (currentMessage.classList.contains('sent')) {
+                            // Blue sent message tail
+                            bubble.style.setProperty('background', '#007AFF', 'important');
+                            bubble.style.setProperty('color', 'white', 'important');
+                            bubble.style.setProperty('border-radius', '20px', 'important');
+                            bubble.style.border = 'none';
+                            
+                            bubble.style.position = 'relative';
+                            const tailHTML = `<div style="position: absolute; bottom: 0; right: -3px; width: 11px; height: 11px; background: #007AFF; border-radius: 0 0 11px 0; transform: rotate(45deg);"></div>`;
+                            bubble.insertAdjacentHTML('beforeend', tailHTML);
+                        } else {
+                            // Gray received message tail
+                            bubble.style.setProperty('background', '#e9e9eb', 'important');
+                            bubble.style.setProperty('color', 'black', 'important');
+                            bubble.style.setProperty('border-radius', '20px', 'important');
+                            bubble.style.border = 'none';
+                            
+                            bubble.style.position = 'relative';
+                            const tailHTML = `<div style="position: absolute; bottom: 0; left: -3px; width: 11px; height: 11px; background: #e9e9eb; border-radius: 0 0 0 11px; transform: rotate(-45deg);"></div>`;
+                            bubble.insertAdjacentHTML('beforeend', tailHTML);
+                        }
+                    }
+                }
+            }
+        }
+
+        function playAndRecord() {
+            playConversation(true);
+        }
+
+        function stopPlayback() {
+            isPlaying = false;
+            
+            timeouts.forEach(timeout => clearTimeout(timeout));
+            timeouts = [];
+            
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+            
+            document.querySelector('.play-btn').disabled = false;
+            document.querySelector('.record-btn').disabled = false;
+            document.querySelector('.stop-btn').disabled = true;
+            
+            const typingIndicator = document.getElementById('typingIndicator');
+            typingIndicator.classList.remove('visible');
+            updateTimer(0);
+        }
+
+        document.getElementById('contactName').addEventListener('input', updateContactInfo);
+        document.getElementById('avatarUrl').addEventListener('input', updateContactInfo);
+        
+        updateContactInfo();
+    </script>
+</body>
+</html>
