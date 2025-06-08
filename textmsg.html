@@ -127,13 +127,12 @@
         .status-right {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
         }
         .signal-bars {
             display: flex;
             gap: 2px;
             align-items: flex-end;
-            margin-right: 4px;
         }
         .signal-bar {
             width: 3px;
@@ -145,9 +144,10 @@
         .signal-bar:nth-child(3) { height: 8px; }
         .signal-bar:nth-child(4) { height: 10px; }
         .wifi-icon {
-            width: 15px;
-            height: 11px;
-            margin-right: 4px;
+            width: 16px;
+            height: 12px;
+            display: flex;
+            align-items: center;
         }
         .battery-icon {
             width: 24px;
@@ -396,10 +396,11 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                             <div class="signal-bar"></div>
                             <div class="signal-bar"></div>
                         </div>
-                        <svg class="wifi-icon" viewBox="0 0 15 11" fill="none">
-                            <path d="M7.5 11L5.5 8.5C6.33333 7.83333 7.41667 7.5 8.75 7.5C10.0833 7.5 11.1667 7.83333 12 8.5L10 11H7.5Z" fill="currentColor"/>
-                            <path d="M7.5 11L3 5.5C4.66667 4.16667 6.83333 3.5 9.5 3.5C12.1667 3.5 14.3333 4.16667 16 5.5L14.5 7C13.1667 6 11.5 5.5 9.5 5.5C7.5 5.5 5.83333 6 4.5 7L7.5 11Z" fill="currentColor"/>
-                            <path d="M7.5 11L0.5 2.5C3 0.833333 6.16667 0 10 0C13.8333 0 17 0.833333 19.5 2.5L18 4C15.8333 2.66667 13.1667 2 10 2C6.83333 2 4.16667 2.66667 2 4L7.5 11Z" fill="currentColor"/>
+                        <svg class="wifi-icon" viewBox="0 0 18 14" fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 13.5a.75.75 0 0 1-.75.75.75.75 0 0 1-.75-.75.75.75 0 0 1 .75-.75.75.75 0 0 1 .75.75Z"/>
+                            <path d="M4.5 10.5c1.66-1.25 3.84-2 4.5-2s2.84.75 4.5 2"/>
+                            <path d="M2.25 7.5c2.76-2.07 6.24-3.25 6.75-3.25s4.99 1.18 6.75 3.25"/>
+                            <path d="M0.75 4.5c3.86-2.89 8.14-4.25 8.25-4.25s4.39 1.36 8.25 4.25"/>
                         </svg>
                         <svg class="battery-icon" viewBox="0 0 24 12" fill="none">
                             <rect x="0" y="2" width="20" height="8" rx="2" stroke="currentColor" stroke-width="1"/>
