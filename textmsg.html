@@ -20,10 +20,10 @@
         .main-container {
             display: flex;
             gap: 30px;
-            max-width: 700px;
+            max-width: 900px;
             margin: 0 auto;
             align-items: flex-start;
-            overflow: hidden;
+            overflow: visible;
         }
         .controls {
             background: #f8f8f8;
@@ -34,9 +34,10 @@
             flex-shrink: 0;
         }
         .phone-container {
-            flex: 1;
             display: flex;
             justify-content: center;
+            max-width: 320px;
+            flex-shrink: 0;
         }
         .container {
             background: #fff;
@@ -45,7 +46,6 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             width: 320px;
             height: 640px;
-            flex-shrink: 0;
             border: 8px solid #000;
             box-sizing: border-box;
             display: flex;
@@ -77,6 +77,11 @@
             gap: 10px;
             margin-top: 15px;
         }
+        .name-button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
         button {
             flex: 1;
             padding: 12px;
@@ -94,6 +99,11 @@
         .stop-btn {
             background: #666;
             color: white;
+        }
+        .random-male-btn, .random-female-btn {
+            background: #34C759;
+            color: white;
+            font-size: 13px;
         }
         button:hover {
             opacity: 0.8;
@@ -152,6 +162,10 @@
         .battery-icon {
             width: 24px;
             height: 12px;
+        }
+        .battery-percentage {
+            font-size: 12px;
+            color: #000;
         }
         .header {
             background: #f8f8f8;
@@ -345,6 +359,21 @@
                 opacity: 1;
             }
         }
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .toggle-label {
+            font-size: 14px;
+            color: #333;
+        }
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -353,6 +382,10 @@
             <div class="control-group">
                 <label for="contactName">Contact Name:</label>
                 <input type="text" id="contactName" value="Melody" placeholder="Enter contact name" aria-label="Contact name">
+                <div class="name-button-group">
+                    <button class="random-male-btn" onclick="setRandomMaleName()" aria-label="Random male name">Random Male Name</button>
+                    <button class="random-female-btn" onclick="setRandomFemaleName()" aria-label="Random female name">Random Female Name</button>
+                </div>
             </div>
             
             <div class="control-group">
@@ -376,6 +409,11 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                 <input type="number" id="runTime" value="30" min="1" step="1" aria-label="Run time in seconds">
             </div>
             
+            <div class="toggle-group">
+                <input type="checkbox" id="startOutgoing" aria-label="Start with outgoing message">
+                <label class="toggle-label" for="startOutgoing">Start with Outgoing Message</label>
+            </div>
+            
             <div class="button-group">
                 <button class="play-btn" onclick="playConversation()" aria-label="Play conversation">▶ Play</button>
                 <button class="stop-btn" onclick="stopPlayback()" disabled aria-label="Stop playback">⏹ Stop</button>
@@ -387,7 +425,7 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
             <div class="container">
                 <div class="status-bar">
                     <div class="status-left">
-                        <span>9:41</span>
+                        <span id="currentTime">9:41</span>
                     </div>
                     <div class="status-right">
                         <div class="signal-bars">
@@ -404,9 +442,10 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                         </svg>
                         <svg class="battery-icon" viewBox="0 0 24 12" fill="none">
                             <rect x="0" y="2" width="20" height="8" rx="2" stroke="currentColor" stroke-width="1"/>
-                            <rect x="1.5" y="3.5" width="17" height="5" rx="0.5" fill="currentColor"/>
+                            <rect id="batteryFill" x="1.5" y="3.5" width="17" height="5" rx="0.5" fill="currentColor"/>
                             <rect x="21" y="4.5" width="2" height="3" rx="1" fill="currentColor"/>
                         </svg>
+                        <span id="batteryPercentage" class="battery-percentage"></span>
                     </div>
                 </div>
                 
@@ -441,7 +480,7 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
                 <div class="input-area">
                     <div class="plus-btn" aria-label="More options">+</div>
                     <div class="input-container">
-                        <input type="text" class="message-input" placeholder="iMessage" readonly aria-label="Message input">
+                        <input type="text" class="message-input" placeholder="Message" readonly aria-label="Message input">
                         <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                             <path d="M12 19v2m-4-2v2m8-2v2M5 12h14"/>
@@ -457,6 +496,55 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
         let startTime;
         let totalDuration = 0;
         let timerInterval;
+
+        // Sample name lists (top 10 for demo; expand to top 100 from SSA: www.ssa.gov)
+        const maleNames = ['Liam', 'Noah', 'Oliver', 'Theodore', 'James', 'Henry', 'Mateo', 'Elijah', 'Lucas', 'William'];
+        const femaleNames = ['Olivia', 'Emma', 'Amelia', 'Charlotte', 'Mia', 'Sophia', 'Isabella', 'Evelyn', 'Ava', 'Sofia'];
+        const allNames = [...maleNames, ...femaleNames];
+
+        function getRandomName(list) {
+            return list[Math.floor(Math.random() * list.length)];
+        }
+
+        function setRandomMaleName() {
+            const name = getRandomName(maleNames);
+            document.getElementById('contactName').value = name;
+            updateContactInfo();
+        }
+
+        function setRandomFemaleName() {
+            const name = getRandomName(femaleNames);
+            document.getElementById('contactName').value = name;
+            updateContactInfo();
+        }
+
+        function setRandomContactName() {
+            const name = getRandomName(allNames);
+            document.getElementById('contactName').value = name;
+            updateContactInfo();
+        }
+
+        function setDefaultRunTime() {
+            document.getElementById('runTime').value = 30;
+        }
+
+        function setRandomTime() {
+            const hours = Math.floor(Math.random() * (23 - 9 + 1)) + 9; // 9 AM to 11 PM
+            const minutes = Math.floor(Math.random() * 60);
+            const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+            const formattedTime = `${displayHours}:${minutes.toString().padStart(2, '0')}`; // No AM/PM
+            document.getElementById('currentTime').textContent = formattedTime;
+        }
+
+        function setRandomBatteryLevel() {
+            const minPercent = 20;
+            const maxPercent = 95;
+            const percent = Math.floor(Math.random() * (maxPercent - minPercent + 1)) + minPercent;
+            const maxFillWidth = 17; // Max width of battery fill at 100%
+            const fillWidth = (percent / 100) * maxFillWidth;
+            document.getElementById('batteryFill').setAttribute('width', fillWidth);
+            document.getElementById('batteryPercentage').textContent = `${percent}%`;
+        }
 
         function updateContactInfo() {
             const name = document.getElementById('contactName').value || 'Contact';
@@ -491,7 +579,8 @@ How about 7pm at the theater? ⭐" aria-label="Conversation text"></textarea>
         function parseConversation(text) {
             const lines = text.split('\n').filter(line => line.trim());
             const messages = [];
-            let currentSender = 'sent';
+            const startOutgoing = document.getElementById('startOutgoing').checked;
+            let currentSender = startOutgoing ? 'sent' : 'received';
             
             for (let line of lines) {
                 line = line.trim();
@@ -759,10 +848,17 @@ How about 7pm at the theater? ⭐`;
             updateTimer(0);
         }
 
+        // Initialize on page load
+        window.onload = () => {
+            setRandomContactName();
+            setDefaultRunTime();
+            setRandomTime();
+            setRandomBatteryLevel();
+            updateContactInfo();
+        };
+
         document.getElementById('contactName').addEventListener('input', updateContactInfo);
         document.getElementById('avatarUrl').addEventListener('input', updateContactInfo);
-        
-        updateContactInfo();
     </script>
 </body>
 </html>
