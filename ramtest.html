@@ -1,0 +1,302 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reptilian Archon Massacre</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+  <style>
+    body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; }
+    canvas { border: 2px solid #333; }
+  </style>
+</head>
+<body>
+<script>
+  let player, enemies, projectiles, enemyBullets, courage, wave, gameState, stars;
+  let enemyIdCounter = 0; // For unique enemy IDs
+  let mouseWasClicked = false; // Track mouse clicks
+
+  function setup() {
+    createCanvas(800, 600);
+    resetGame();
+    generateStars();
+  }
+
+  function resetGame() {
+    player = { x: width / 2, y: height / 2, size: 20, speed: 0.1, fireRate: 10, shotLevel: 1 }; // Speed used for lerp
+    enemies = [];
+    projectiles = [];
+    enemyBullets = [];
+    courage = 0;
+    wave = 1;
+    gameState = 'start';
+    enemyIdCounter = 0; // Reset ID counter
+    spawnWave();
+  }
+
+  function generateStars() {
+    stars = [];
+    for (let i = 0; i < 100; i++) {
+      stars.push({ x: random(width), y: random(height), size: random(1, 3) });
+    }
+  }
+
+  function spawnWave() {
+    let enemyCount = wave * 3;
+    for (let i = 0; i < enemyCount; i++) {
+      let angle = random(TWO_PI);
+      let dist = max(width, height);
+      let x = player.x + cos(angle) * dist;
+      let y = player.y + sin(angle) * dist;
+      let speed = (1 + wave * 0.2) * 0.5; // Reduced speed for bullet focus
+      let size = wave % 5 === 0 ? 40 : 20;
+      enemies.push({ 
+        x, y, size, speed, 
+        isBoss: wave % 5 === 0, 
+        fireCooldown: random(60), 
+        id: enemyIdCounter++ 
+      });
+    }
+  }
+
+  function mousePressed() {
+    mouseWasClicked = true; // Set flag on mouse click
+  }
+
+  function draw() {
+    background(0);
+    drawStars();
+    drawMoon();
+
+    if (gameState === 'start') {
+      textAlign(CENTER);
+      fill(255);
+      textSize(32);
+      text('Reptilian Archon Massacre', width / 2, height / 2 - 50);
+      textSize(20);
+      text('Click to Start', width / 2, height / 2 + 50);
+      if (mouseWasClicked) {
+        gameState = 'playing';
+        mouseWasClicked = false; // Reset click flag
+      }
+      return;
+    }
+
+    if (gameState === 'gameover') {
+      textAlign(CENTER);
+      fill(255);
+      textSize(32);
+      text('Game Over', width / 2, height / 2 - 50);
+      textSize(20);
+      text(`Wave: ${wave} | Courage: ${courage}`, width / 2, height / 2);
+      text('Click to Restart', width / 2, height / 2 + 50);
+      if (mouseWasClicked) {
+        resetGame();
+        mouseWasClicked = false; // Reset click flag
+      }
+      return;
+    }
+
+    if (gameState === 'win') {
+      textAlign(CENTER);
+      fill(255);
+      textSize(32);
+      text('Victory!', width / 2, height / 2);
+      textSize(20);
+      text('Click to Restart', width / 2, height / 2 + 50);
+      if (mouseWasClicked) {
+        resetGame();
+        mouseWasClicked = false; // Reset click flag
+      }
+      return;
+    }
+
+    // Update player (follow mouse)
+    player.x = lerp(player.x, mouseX, player.speed);
+    player.y = lerp(player.y, mouseY, player.speed);
+    player.x = constrain(player.x, 0, width);
+    player.y = constrain(player.y, 0, height);
+
+    // Shoot player projectiles
+    if (mouseIsPressed && frameCount % player.fireRate === 0) {
+      let angle = atan2(mouseY - player.y, mouseX - player.x);
+      if (player.shotLevel === 1) {
+        projectiles.push({ x: player.x, y: player.y, vx: cos(angle) * 10, vy: sin(angle) * 10 });
+      } else if (player.shotLevel === 2) {
+        projectiles.push({ x: player.x, y: player.y, vx: cos(angle) * 10, vy: sin(angle) * 10 });
+        projectiles.push({ x: player.x, y: player.y, vx: cos(angle + 0.2) * 10, vy: sin(angle + 0.2) * 10 });
+      } else {
+        projectiles.push({ x: player.x, y: player.y, vx: cos(angle) * 10, vy: sin(angle) * 10 });
+        projectiles.push({ x: player.x, y: player.y, vx: cos(angle + 0.2) * 10, vy: sin(angle + 0.2) * 10 });
+        projectiles.push({ x: player.x, y: player.y, vx: cos(angle - 0.2) * 10, vy: sin(angle - 0.2) * 10 });
+      }
+    }
+
+    // Update player projectiles
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      let p = projectiles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > width || p.y < 0 || p.y > height) {
+        projectiles.splice(i, 1);
+        continue;
+      }
+      fill(255, 0, 0);
+      ellipse(p.x, p.y, 5);
+    }
+
+    // Update enemies
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      let e = enemies[i];
+      let angle = atan2(player.y - e.y, player.x - e.x);
+      e.x += cos(angle) * e.speed;
+      e.y += sin(angle) * e.speed;
+
+      // Enemy shooting
+      e.fireCooldown--;
+      if (e.fireCooldown <= 0) {
+        let bulletSpeed = 2;
+        let bulletAngle = atan2(player.y - e.y, player.x - e.x);
+        let bulletSize = 8;
+        let offset = e.size / 2 + bulletSize / 2; // Spawn bullet outside enemy
+        let bulletX = e.x + cos(bulletAngle) * offset;
+        let bulletY = e.y + sin(bulletAngle) * offset;
+        enemyBullets.push({
+          x: bulletX,
+          y: bulletY,
+          vx: cos(bulletAngle) * bulletSpeed,
+          vy: sin(bulletAngle) * bulletSpeed,
+          size: bulletSize,
+          ownerId: e.id,
+          age: 0,
+          timeout: 60 // 1 second at 60 FPS
+        });
+        e.fireCooldown = e.isBoss ? 30 : 60; // Bosses fire twice as fast
+      }
+
+      // Collision with player projectiles
+      for (let j = projectiles.length - 1; j >= 0; j--) {
+        let p = projectiles[j];
+        if (dist(e.x, e.y, p.x, p.y) < e.size / 2) {
+          projectiles.splice(j, 1);
+          enemies.splice(i, 1);
+          courage += e.isBoss ? 50 : 10;
+          break;
+        }
+      }
+    }
+
+    // Update enemy bullets
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+      let b = enemyBullets[i];
+      b.age++; // Increment bullet age
+
+      // Physics-based homing: apply acceleration toward player
+      let dx = player.x - b.x;
+      let dy = player.y - b.y;
+      let distToPlayer = sqrt(dx * dx + dy * dy);
+      if (distToPlayer > 0) {
+        let homingStrength = 0.05; // Acceleration magnitude
+        let ax = (dx / distToPlayer) * homingStrength;
+        let ay = (dy / distToPlayer) * homingStrength;
+        b.vx += ax;
+        b.vy += ay;
+        // Cap speed at 2
+        let speed = sqrt(b.vx * b.vx + b.vy * b.vy);
+        if (speed > 2) {
+          b.vx = (b.vx / speed) * 2;
+          b.vy = (b.vy / speed) * 2;
+        }
+      }
+
+      b.x += b.vx;
+      b.y += b.vy;
+
+      if (b.x < 0 || b.x > width || b.y < 0 || b.y > height) {
+        enemyBullets.splice(i, 1);
+        continue;
+      }
+
+      // Collision with player
+      if (dist(b.x, b.y, player.x, player.y) < b.size / 2 + player.size / 2) {
+        gameState = 'gameover';
+        enemyBullets.splice(i, 1);
+        continue;
+      }
+
+      // Collision with enemies (skip owner only if within timeout)
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        let e = enemies[j];
+        if (e.id === b.ownerId && b.age < b.timeout) continue; // Skip owner during timeout
+        if (dist(b.x, b.y, e.x, e.y) < b.size / 2 + e.size / 2) {
+          enemies.splice(j, 1);
+          enemyBullets.splice(i, 1);
+          courage += e.isBoss ? 50 : 10;
+          break;
+        }
+      }
+
+      fill(0, 255, 0);
+      ellipse(b.x, b.y, b.size);
+    }
+
+    // Draw enemies
+    for (let e of enemies) {
+      fill(e.isBoss ? 100 : 0, 255, 0);
+      ellipse(e.x, e.y, e.size);
+      if (e.isBoss) {
+        fill(255);
+        ellipse(e.x - 5, e.y - 5, 5);
+        ellipse(e.x + 5, e.y - 5, 5);
+      }
+    }
+
+    // Draw player
+    fill(255);
+    ellipse(player.x, player.y, player.size);
+
+    // Upgrade weapon
+    if (courage >= 100 && player.shotLevel === 1) {
+      player.shotLevel = 2;
+      player.fireRate = 8;
+    } else if (courage >= 300 && player.shotLevel === 2) {
+      player.shotLevel = 3;
+      player.fireRate = 6;
+    }
+
+    // Next wave
+    if (enemies.length === 0 && wave <= 10) {
+      wave++;
+      if (wave <= 10) {
+        spawnWave();
+      } else {
+        gameState = 'win';
+      }
+    }
+
+    // UI
+    fill(255);
+    textSize(16);
+    textAlign(LEFT);
+    text(`Wave: ${wave}`, 10, 20);
+    text(`Courage: ${courage}`, 10, 40);
+
+    // Reset click flag after processing
+    mouseWasClicked = false;
+  }
+
+  function drawStars() {
+    fill(255);
+    noStroke();
+    for (let star of stars) {
+      ellipse(star.x, star.y, star.size);
+    }
+  }
+
+  function drawMoon() {
+    fill(200, 200, 255, 100);
+    ellipse(width - 50, 50, 80);
+  }
+</script>
+</body>
+</html>
