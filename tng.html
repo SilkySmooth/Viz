@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starship Engine Pulse with Binaural Beats</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .presets {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        input[type="range"] {
+            width: 200px;
+        }
+        .readout {
+            width: 80px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="toggleSound()">Start/Stop Engine Sound</button>
+    <div class="presets">
+        <label><input type="radio" name="preset" value="default" checked onclick="applyPreset('default')"> Default</label>
+        <label><input type="radio" name="preset" value="deepSleep" onclick="applyPreset('deepSleep')"> Deep Sleep</label>
+        <label><input type="radio" name="preset" value="relaxation" onclick="applyPreset('relaxation')"> Relaxation</label>
+        <label><input type="radio" name="preset" value="dreamscape" onclick="applyPreset('dreamscape')"> Dreamscape</label>
+        <label><input type="radio" name="preset" value="warpCore" onclick="applyPreset('warpCore')"> Warp Core</label>
+        <label><input type="radio" name="preset" value="cosmicDrift" onclick="applyPreset('cosmicDrift')"> Cosmic Drift</label>
+    </div>
+    <div class="control">
+        <label for="volume">Volume (0-100%):</label>
+        <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5" oninput="adjustVolume(this.value)">
+        <span class="readout" id="volume-readout">50%</span>
+    </div>
+    <div class="control">
+        <label for="frequency">Base Frequency (10-100 Hz):</label>
+        <input type="range" id="frequency" min="10" max="100" step="1" value="40" oninput="adjustFrequency(this.value)">
+        <span class="readout" id="frequency-readout">40 Hz</span>
+    </div>
+    <div class="control">
+        <label for="pulsation">Pulsation (0.05-4 Hz):</label>
+        <input type="range" id="pulsation" min="0.05" max="4" step="0.01" value="0.5" oninput="adjustPulsation(this.value)">
+        <span class="readout" id="pulsation-readout">0.5 Hz</span>
+    </div>
+    <div class="control">
+        <label for="binaural">Binaural Beat (0-10 Hz):</label>
+        <input type="range" id="binaural" min="0" max="10" step="0.1" value="2" oninput="adjustBinaural(this.value)">
+        <span class="readout" id="binaural-readout">2 Hz</span>
+    </div>
+    <script>
+        let audioContext;
+        let oscillatorLeft;
+        let oscillatorRight;
+        let gainNode;
+        let lfo;
+        let isPlaying = false;
+        let baseFrequency = 40; // Default base frequency
+        let binauralBeat = 2; // Default binaural beat
+
+        const presets = {
+            default: { volume: 0.5, frequency: 40, pulsation: 0.5, binaural: 2 },
+            deepSleep: { volume: 0.3, frequency: 20, pulsation: 1, binaural: 1 }, // Delta for deep sleep
+            relaxation: { volume: 0.4, frequency: 30, pulsation: 0.8, binaural: 6 }, // Theta for relaxation
+            dreamscape: { volume: 0.35, frequency: 25, pulsation: 1.5, binaural: 4 }, // Theta for dreaming
+            warpCore: { volume: 0.5, frequency: 50, pulsation: 2, binaural: 3 }, // Energetic starship vibe
+            cosmicDrift: { volume: 0.25, frequency: 15, pulsation: 0.2, binaural: 0.5 } // Slow, ambient drift
+        };
+
+        function createSound() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            oscillatorLeft = audioContext.createOscillator();
+            oscillatorRight = audioContext.createOscillator();
+            gainNode = audioContext.createGain();
+            lfo = audioContext.createOscillator();
+
+            // Create stereo panner for binaural beats
+            let pannerLeft = audioContext.createStereoPanner();
+            let pannerRight = audioContext.createStereoPanner();
+            pannerLeft.pan.setValueAtTime(-1, audioContext.currentTime); // Left ear
+            pannerRight.pan.setValueAtTime(1, audioContext.currentTime); // Right ear
+
+            // Configure oscillators for binaural beats
+            oscillatorLeft.type = 'sine';
+            oscillatorRight.type = 'sine';
+            oscillatorLeft.frequency.setValueAtTime(baseFrequency, audioContext.currentTime);
+            oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
+
+            // Configure LFO for pulsation
+            lfo.type = 'sine';
+            lfo.frequency.setValueAtTime(0.5, audioContext.currentTime);
+
+            // Create gain for LFO to modulate the main gain
+            let lfoGain = audioContext.createGain();
+            lfoGain.gain.setValueAtTime(0.1, audioContext.currentTime); // Subtle modulation depth
+
+            // Connect LFO to modulate gainNode's gain
+            lfo.connect(lfoGain);
+            lfoGain.connect(gainNode.gain);
+
+            // Connect oscillators to panners, then to gainNode and output
+            oscillatorLeft.connect(pannerLeft);
+            oscillatorRight.connect(pannerRight);
+            pannerLeft.connect(gainNode);
+            pannerRight.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            // Set initial volume to 50%
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+
+            // Start oscillators
+            oscillatorLeft.start();
+            oscillatorRight.start();
+            lfo.start();
+        }
+
+        function toggleSound() {
+            if (!isPlaying) {
+                if (!audioContext) {
+                    createSound();
+                } else {
+                    audioContext.resume();
+                }
+                isPlaying = true;
+                document.querySelector('button').textContent = 'Stop Engine Sound';
+            } else {
+                audioContext.suspend();
+                isPlaying = false;
+                document.querySelector('button').textContent = 'Start Engine Sound';
+            }
+        }
+
+        function adjustVolume(value) {
+            if (gainNode) {
+                gainNode.gain.setValueAtTime(value, audioContext.currentTime);
+            }
+            document.getElementById('volume-readout').textContent = `${Math.round(value * 100)}%`;
+            document.getElementById('volume').value = value;
+        }
+
+        function adjustFrequency(value) {
+            baseFrequency = parseFloat(value);
+            if (oscillatorLeft && oscillatorRight) {
+                oscillatorLeft.frequency.setValueAtTime(baseFrequency, audioContext.currentTime);
+                oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
+            }
+            document.getElementById('frequency-readout').textContent = `${baseFrequency} Hz`;
+            document.getElementById('frequency').value = value;
+        }
+
+        function adjustPulsation(value) {
+            if (lfo) {
+                lfo.frequency.setValueAtTime(value, audioContext.currentTime);
+            }
+            document.getElementById('pulsation-readout').textContent = `${parseFloat(value).toFixed(1)} Hz`;
+            document.getElementById('pulsation').value = value;
+        }
+
+        function adjustBinaural(value) {
+            binauralBeat = parseFloat(value);
+            if (oscillatorRight) {
+                oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
+            }
+            document.getElementById('binaural-readout').textContent = `${binauralBeat} Hz`;
+            document.getElementById('binaural').value = value;
+        }
+
+        function applyPreset(presetName) {
+            const preset = presets[presetName];
+            adjustVolume(preset.volume);
+            adjustFrequency(preset.frequency);
+            adjustPulsation(preset.pulsation);
+            adjustBinaural(preset.binaural);
+        }
+    </script>
+</body>
+</html>
