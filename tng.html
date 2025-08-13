@@ -77,8 +77,8 @@
     </div>
     <div class="control">
         <label for="binaural">Binaural Beat (0-10 Hz):</label>
-        <input type="range" id="binaural" min="0" max="10" step="0.1" value="2" oninput="adjustBinaural(this.value)">
-        <span class="readout" id="binaural-readout">2 Hz</span>
+        <input type="range" id="binaural" min="0" max="10" step="0.1" value="0.6" oninput="adjustBinaural(this.value)">
+        <span class="readout" id="binaural-readout">0.6 Hz</span>
     </div>
     <script>
         let audioContext;
@@ -88,15 +88,15 @@
         let lfo;
         let isPlaying = false;
         let baseFrequency = 40; // Default base frequency
-        let binauralBeat = 2; // Default binaural beat
+        let binauralBeat = 0.6; // Default binaural beat
 
         const presets = {
-            default: { volume: 0.5, frequency: 40, pulsation: 0.5, binaural: 2 },
-            deepSleep: { volume: 0.3, frequency: 20, pulsation: 1, binaural: 1 }, // Delta for deep sleep
-            relaxation: { volume: 0.4, frequency: 30, pulsation: 0.8, binaural: 6 }, // Theta for relaxation
-            dreamscape: { volume: 0.35, frequency: 25, pulsation: 1.5, binaural: 4 }, // Theta for dreaming
-            warpCore: { volume: 0.5, frequency: 50, pulsation: 2, binaural: 3 }, // Energetic starship vibe
-            cosmicDrift: { volume: 0.25, frequency: 15, pulsation: 0.2, binaural: 0.5 } // Slow, ambient drift
+            default: { volume: 0.5, frequency: 40, pulsation: 0.5, binaural: 0.6 },
+            deepSleep: { volume: 0.3, frequency: 20, pulsation: 1, binaural: 1 },
+            relaxation: { volume: 0.4, frequency: 30, pulsation: 0.8, binaural: 6 },
+            dreamscape: { volume: 0.35, frequency: 25, pulsation: 1.5, binaural: 4 },
+            warpCore: { volume: 0.5, frequency: 50, pulsation: 2, binaural: 3 },
+            cosmicDrift: { volume: 0.25, frequency: 15, pulsation: 0.2, binaural: 0.5 }
         };
 
         function createSound() {
