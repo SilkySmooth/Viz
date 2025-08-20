@@ -86,10 +86,19 @@
         let oscillatorRight;
         let gainNode;
         let lfo;
+        let lfoGain;
         let isPlaying = false;
         let baseFrequency = 40; // Default base frequency
         let binauralBeat = 0.6; // Default binaural beat
         let targetVolume = 0.5; // Track target volume for fade-in/out
+        const FADE_IN_DURATION = 0.3; // Total fade-in duration
+        const FADE_OUT_DURATION = 0.45; // Total fade-out duration
+        const INITIAL_FADE_DURATION = 0.05; // Initial fade for smooth start/stop
+        const SLOW_FADE_IN_DURATION = 0.15; // Slow phase for fade-in (0.01 to 0.05)
+        const FAST_FADE_DURATION = 0.1; // Fast phase to/from target
+        const SLOW_FADE_OUT_DURATION = 0.3; // Slow phase for fade-out (0.05 to 0)
+        const NEAR_ZERO_GAIN = 0.05; // Intermediate gain for slow transition
+        const INITIAL_ZERO_GAIN = 0.01; // Very low gain for initial fade-in
 
         const presets = {
             default: { volume: 0.5, frequency: 40, pulsation: 0.5, binaural: 0.6 },
@@ -101,86 +110,153 @@
         };
 
         function createSound() {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            oscillatorLeft = audioContext.createOscillator();
-            oscillatorRight = audioContext.createOscillator();
-            gainNode = audioContext.createGain();
-            lfo = audioContext.createOscillator();
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                oscillatorLeft = audioContext.createOscillator();
+                oscillatorRight = audioContext.createOscillator();
+                gainNode = audioContext.createGain();
+                lfo = audioContext.createOscillator();
+                lfoGain = audioContext.createGain();
 
-            // Create stereo panner for binaural beats
-            let pannerLeft = audioContext.createStereoPanner();
-            let pannerRight = audioContext.createStereoPanner();
-            pannerLeft.pan.setValueAtTime(-1, audioContext.currentTime); // Left ear
-            pannerRight.pan.setValueAtTime(1, audioContext.currentTime); // Right ear
+                // Create stereo panner for binaural beats
+                let pannerLeft = audioContext.createStereoPanner();
+                let pannerRight = audioContext.createStereoPanner();
+                pannerLeft.pan.setValueAtTime(-1, audioContext.currentTime); // Left ear
+                pannerRight.pan.setValueAtTime(1, audioContext.currentTime); // Right ear
 
-            // Configure oscillators for binaural beats
-            oscillatorLeft.type = 'sine';
-            oscillatorRight.type = 'sine';
-            oscillatorLeft.frequency.setValueAtTime(baseFrequency, audioContext.currentTime);
-            oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
+                // Configure oscillators for binaural beats
+                oscillatorLeft.type = 'sine';
+                oscillatorRight.type = 'sine';
+                oscillatorLeft.frequency.setValueAtTime(baseFrequency, audioContext.currentTime);
+                oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
 
-            // Configure LFO for pulsation
-            lfo.type = 'sine';
-            lfo.frequency.setValueAtTime(0.5, audioContext.currentTime);
+                // Configure LFO for pulsation
+                lfo.type = 'sine';
+                lfo.frequency.setValueAtTime(0.5, audioContext.currentTime);
+                lfoGain.gain.setValueAtTime(0, audioContext.currentTime); // Start LFO gain at 0
 
-            // Create gain for LFO to modulate the main gain
-            let lfoGain = audioContext.createGain();
-            lfoGain.gain.setValueAtTime(0.1, audioContext.currentTime); // Subtle modulation depth
+                // Connect LFO to modulate gainNode's gain
+                lfo.connect(lfoGain);
+                lfoGain.connect(gainNode.gain);
 
-            // Connect LFO to modulate gainNode's gain
-            lfo.connect(lfoGain);
-            lfoGain.connect(gainNode.gain);
+                // Connect oscillators to panners, then to gainNode and output
+                oscillatorLeft.connect(pannerLeft);
+                oscillatorRight.connect(pannerRight);
+                pannerLeft.connect(gainNode);
+                pannerRight.connect(gainNode);
+                gainNode.connect(audioContext.destination);
 
-            // Connect oscillators to panners, then to gainNode and output
-            oscillatorLeft.connect(pannerLeft);
-            oscillatorRight.connect(pannerRight);
-            pannerLeft.connect(gainNode);
-            pannerRight.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+                // Set initial gain to 0 to prevent clicks
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
 
-            // Set initial volume to 0 for fade-in
-            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                // Start oscillators with a slight delay
+                const startTime = audioContext.currentTime + 0.05;
+                oscillatorLeft.start(startTime);
+                oscillatorRight.start(startTime);
+                lfo.start(startTime);
+            } catch (error) {
+                console.error('Error creating sound:', error);
+            }
+        }
 
-            // Start oscillators
-            oscillatorLeft.start();
-            oscillatorRight.start();
-            lfo.start();
+        function stopSound() {
+            if (oscillatorLeft && oscillatorRight && lfo) {
+                try {
+                    // Ensure gain and LFO gain are 0 before stopping
+                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                    lfoGain.gain.setValueAtTime(0, audioContext.currentTime);
+                    oscillatorLeft.stop();
+                    oscillatorRight.stop();
+                    lfo.stop();
+                    oscillatorLeft = null;
+                    oscillatorRight = null;
+                    lfo = null;
+                    lfoGain = null;
+                } catch (error) {
+                    console.error('Error stopping oscillators:', error);
+                }
+            }
+            if (audioContext) {
+                try {
+                    audioContext.close();
+                    audioContext = null;
+                } catch (error) {
+                    console.error('Error closing audio context:', error);
+                }
+            }
         }
 
         function toggleSound() {
             if (!isPlaying) {
                 if (!audioContext) {
                     createSound();
-                    // Fade in over 0.5 seconds
-                    gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + 0.5);
-                } else {
+                    // Fade in: very slow to INITIAL_ZERO_GAIN, slow to NEAR_ZERO_GAIN, then to target
+                    try {
+                        gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                        gainNode.gain.linearRampToValueAtTime(INITIAL_ZERO_GAIN, audioContext.currentTime + INITIAL_FADE_DURATION);
+                        gainNode.gain.linearRampToValueAtTime(NEAR_ZERO_GAIN, audioContext.currentTime + INITIAL_FADE_DURATION + SLOW_FADE_IN_DURATION);
+                        gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + FADE_IN_DURATION);
+                        lfoGain.gain.cancelScheduledValues(audioContext.currentTime);
+                        lfoGain.gain.setValueAtTime(0, audioContext.currentTime);
+                        lfoGain.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + FADE_IN_DURATION);
+                    } catch (error) {
+                        console.error('Error during fade-in:', error);
+                    }
+                } else if (audioContext.state === 'suspended') {
                     // Resume and fade in
-                    gainNode.gain.cancelScheduledValues(audioContext.currentTime);
-                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                    gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + 0.5);
-                    audioContext.resume();
+                    try {
+                        gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                        gainNode.gain.linearRampToValueAtTime(INITIAL_ZERO_GAIN, audioContext.currentTime + INITIAL_FADE_DURATION);
+                        gainNode.gain.linearRampToValueAtTime(NEAR_ZERO_GAIN, audioContext.currentTime + INITIAL_FADE_DURATION + SLOW_FADE_IN_DURATION);
+                        gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + FADE_IN_DURATION);
+                        lfoGain.gain.cancelScheduledValues(audioContext.currentTime);
+                        lfoGain.gain.setValueAtTime(0, audioContext.currentTime);
+                        lfoGain.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + FADE_IN_DURATION);
+                        audioContext.resume();
+                    } catch (error) {
+                        console.error('Error resuming audio:', error);
+                    }
                 }
                 isPlaying = true;
                 document.querySelector('button').textContent = 'Stop Engine Sound';
             } else {
-                // Fade out over 0.5 seconds
-                gainNode.gain.cancelScheduledValues(audioContext.currentTime);
-                gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.5);
+                // Fade out: initial smooth, faster to near zero, then slow to 0
+                try {
+                    gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(gainNode.gain.value * 0.9, audioContext.currentTime + INITIAL_FADE_DURATION);
+                    gainNode.gain.linearRampToValueAtTime(NEAR_ZERO_GAIN, audioContext.currentTime + INITIAL_FADE_DURATION + FAST_FADE_DURATION);
+                    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + FADE_OUT_DURATION);
+                    lfoGain.gain.cancelScheduledValues(audioContext.currentTime);
+                    lfoGain.gain.setValueAtTime(lfoGain.gain.value, audioContext.currentTime);
+                    lfoGain.gain.linearRampToValueAtTime(0, audioContext.currentTime + FADE_OUT_DURATION);
+                } catch (error) {
+                    console.error('Error during fade-out:', error);
+                }
                 setTimeout(() => {
-                    audioContext.suspend();
-                    isPlaying = false;
-                    document.querySelector('button').textContent = 'Start Engine Sound';
-                }, 500); // Match fade-out duration
+                    try {
+                        stopSound();
+                        isPlaying = false;
+                        document.querySelector('button').textContent = 'Start Engine Sound';
+                    } catch (error) {
+                        console.error('Error stopping sound:', error);
+                    }
+                }, FADE_OUT_DURATION * 1000 + 150); // Add 150ms buffer
             }
         }
 
         function adjustVolume(value) {
             targetVolume = parseFloat(value);
             if (gainNode && isPlaying) {
-                gainNode.gain.cancelScheduledValues(audioContext.currentTime);
-                gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
-                gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + 0.2);
+                try {
+                    gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + 0.2);
+                } catch (error) {
+                    console.error('Error adjusting volume:', error);
+                }
             }
             document.getElementById('volume-readout').textContent = `${Math.round(value * 100)}%`;
             document.getElementById('volume').value = value;
@@ -189,8 +265,12 @@
         function adjustFrequency(value) {
             baseFrequency = parseFloat(value);
             if (oscillatorLeft && oscillatorRight) {
-                oscillatorLeft.frequency.setValueAtTime(baseFrequency, audioContext.currentTime);
-                oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
+                try {
+                    oscillatorLeft.frequency.setValueAtTime(baseFrequency, audioContext.currentTime);
+                    oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
+                } catch (error) {
+                    console.error('Error adjusting frequency:', error);
+                }
             }
             document.getElementById('frequency-readout').textContent = `${baseFrequency} Hz`;
             document.getElementById('frequency').value = value;
@@ -198,7 +278,11 @@
 
         function adjustPulsation(value) {
             if (lfo) {
-                lfo.frequency.setValueAtTime(value, audioContext.currentTime);
+                try {
+                    lfo.frequency.setValueAtTime(value, audioContext.currentTime);
+                } catch (error) {
+                    console.error('Error adjusting pulsation:', error);
+                }
             }
             document.getElementById('pulsation-readout').textContent = `${parseFloat(value).toFixed(1)} Hz`;
             document.getElementById('pulsation').value = value;
@@ -207,7 +291,11 @@
         function adjustBinaural(value) {
             binauralBeat = parseFloat(value);
             if (oscillatorRight) {
-                oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
+                try {
+                    oscillatorRight.frequency.setValueAtTime(baseFrequency + binauralBeat, audioContext.currentTime);
+                } catch (error) {
+                    console.error('Error adjusting binaural beat:', error);
+                }
             }
             document.getElementById('binaural-readout').textContent = `${binauralBeat} Hz`;
             document.getElementById('binaural').value = value;
