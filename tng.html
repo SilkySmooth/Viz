@@ -89,6 +89,7 @@
         let isPlaying = false;
         let baseFrequency = 40; // Default base frequency
         let binauralBeat = 0.6; // Default binaural beat
+        let targetVolume = 0.5; // Track target volume for fade-in/out
 
         const presets = {
             default: { volume: 0.5, frequency: 40, pulsation: 0.5, binaural: 0.6 },
@@ -137,8 +138,8 @@
             pannerRight.connect(gainNode);
             gainNode.connect(audioContext.destination);
 
-            // Set initial volume to 50%
-            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+            // Set initial volume to 0 for fade-in
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
 
             // Start oscillators
             oscillatorLeft.start();
@@ -150,21 +151,36 @@
             if (!isPlaying) {
                 if (!audioContext) {
                     createSound();
+                    // Fade in over 0.5 seconds
+                    gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + 0.5);
                 } else {
+                    // Resume and fade in
+                    gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + 0.5);
                     audioContext.resume();
                 }
                 isPlaying = true;
                 document.querySelector('button').textContent = 'Stop Engine Sound';
             } else {
-                audioContext.suspend();
-                isPlaying = false;
-                document.querySelector('button').textContent = 'Start Engine Sound';
+                // Fade out over 0.5 seconds
+                gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.5);
+                setTimeout(() => {
+                    audioContext.suspend();
+                    isPlaying = false;
+                    document.querySelector('button').textContent = 'Start Engine Sound';
+                }, 500); // Match fade-out duration
             }
         }
 
         function adjustVolume(value) {
-            if (gainNode) {
-                gainNode.gain.setValueAtTime(value, audioContext.currentTime);
+            targetVolume = parseFloat(value);
+            if (gainNode && isPlaying) {
+                gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + 0.2);
             }
             document.getElementById('volume-readout').textContent = `${Math.round(value * 100)}%`;
             document.getElementById('volume').value = value;
